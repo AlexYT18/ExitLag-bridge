@@ -1,0 +1,51 @@
+name: Shared Ubuntu installer compatibility
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ubuntu:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: v0.4.0-alpha.2
+      - name: Download the exact Ubuntu 22.04 release package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p build/shared-ubuntu
+          # Resolve by asset ID so simplifying its public filename keeps this check valid.
+          url="$(gh api repos/Cheaux/exitlag-bridge/releases/assets/693786676 --jq .browser_download_url)"
+          case "$url" in
+            https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/*) ;;
+            *) echo 'Unexpected release download location.' >&2; exit 1 ;;
+          esac
+          curl --fail --location --retry 2 --output build/shared-ubuntu/exitlag-bridge_0.4.0_amd64.deb "$url"
+          echo 'c51a6e4b111bdd7685dd05f56cf8f92238a1f1509d47412c93a6df1f027ea845  build/shared-ubuntu/exitlag-bridge_0.4.0_amd64.deb' | sha256sum --check -
+      - name: Install the same package with its declared dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ./build/shared-ubuntu/exitlag-bridge_0.4.0_amd64.deb xvfb xauth fonts-liberation
+          ldd /usr/lib/exitlag-bridge/backend/exitlag-netd
+      - name: Check first-run UI from the installed package
+        run: xvfb-run -a /usr/bin/python3 tests/test_desktop_ui.py /usr/lib/exitlag-bridge
+      - name: Verify the installed Windows payloads in a fresh Wine runtime
+        run: xvfb-run -a /usr/bin/python3 tests/installer_fresh_runtime.py /usr/lib/exitlag-bridge/installers/payloads
+      - name: Check installed routing and cleanup in an isolated namespace
+        run: |
+          sudo modprobe nfnetlink_queue
+          sudo unshare --net runuser -u "$USER" -- /usr/bin/python3 tests/test_installed_routing.py /usr/lib/exitlag-bridge
+      - name: Remove the package and preserve user data
+        run: |
+          marker="$HOME/.local/share/exitlag-bridge/compatibility-test-marker"
+          mkdir -p "$(dirname "$marker")"
+          touch "$marker"
+          sudo apt-get remove -y exitlag-bridge
+          test -f "$marker"
+          test ! -e /usr/lib/exitlag-bridge/backend/exitlag-netd
