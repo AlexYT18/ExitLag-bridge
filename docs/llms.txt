@@ -1,0 +1,46 @@
+# ExitLag Bridge
+
+> Unofficial experimental open-source compatibility bridge for the official ExitLag Windows client on Linux and Apple Silicon macOS.
+
+The bridge is GPL-3.0-only. Users separately obtain the official client and need
+their own valid account and active subscription or trial. ExitLag Bridge is not
+affiliated with, endorsed by, or supported by ExitLag.
+
+This file is a documentation index, not evidence of indexing or game support.
+Use the linked compatibility record for precise results.
+
+## Primary documentation
+
+- [Project overview](https://cheaux.github.io/exitlag-bridge/): Supported platforms, setup, tested games and routing architecture.
+- [Repository README](https://github.com/Cheaux/exitlag-bridge/blob/main/README.md): Source project overview and developer instructions.
+- [Installers](https://github.com/Cheaux/exitlag-bridge/releases): Experimental Linux x86_64 and macOS arm64 packages, matching source and checksums.
+- [Install and uninstall guide](https://github.com/Cheaux/exitlag-bridge/blob/main/installers/README.md): Dependencies, vendor wizard, administrator helper and account-preserving removal.
+- [Setup FAQ](https://github.com/Cheaux/exitlag-bridge/blob/main/docs/faq.md): Linux, Mac, Wine, Proton, account requirements and common setup questions.
+- [Compatibility and evidence](https://github.com/Cheaux/exitlag-bridge/blob/main/docs/compatibility.md): Working, partial, unstable and detection-only game results.
+
+## Technical documentation
+
+- [Architecture](https://github.com/Cheaux/exitlag-bridge/blob/main/docs/architecture.md): Native interception, attribution and the official client's local proxy.
+- [Mac backend](https://github.com/Cheaux/exitlag-bridge/blob/main/macos/README.md): WoW-specific Apple Silicon implementation and tests.
+- [Process identity mapping](https://github.com/Cheaux/exitlag-bridge/blob/main/docs/process-identity-translation.md): Native Linux and Wine/Proton mapping scope.
+- [Security model](https://github.com/Cheaux/exitlag-bridge/blob/main/docs/security-review.md): Privileges, authentication and routing controls.
+- [Third-party provenance](https://github.com/Cheaux/exitlag-bridge/blob/main/THIRD_PARTY.md): Licenses, original interface-authoring record limitation and no commercial SDK implementation bundled.
+- [Contributing](https://github.com/Cheaux/exitlag-bridge/blob/main/CONTRIBUTING.md): Reproducible compatibility reports, pull requests and diagnostic redaction.
+
+## Scope and evidence
+
+WoW Classic Era gameplay was maintainer-verified on Linux and observed working on
+Apple Silicon Mac. Mac WoW Forever testing reached relayed character selection
+only; world entry was unavailable before release. Earlier native Linux Minecraft
+Java sessions relayed traffic but disconnected. Dota 2 and Tibia have detection
+evidence only. Other games are untested.
+
+Ubuntu 22.04/24.04 installer lifecycle checks are separate from gameplay tests.
+The Mac binary targets macOS 15+ on Apple Silicon, was live-tested on macOS 27.2,
+and supports recognized WoW installations over IPv4 TCP only. Intel, Mac UDP and
+Mac IPv6 routing are not implemented. Mac installers are unsigned and not notarized.
+
+The native bridge steers recognized game traffic into the official client's local
+proxy. The official client under Wine handles authentication, route selection and
+relay transport. No independent remote route API or relay protocol is implemented.
+Latency reduction is not guaranteed.

@@ -1,12 +1,42 @@
-# ExitLag Bridge
+# ExitLag for Linux and macOS — ExitLag Bridge
 
-An **unofficial** compatibility project with a Linux packet-steering backend and an experimental macOS launcher for the official ExitLag client,
-so games running natively, under Proton, or in another Wine prefix can be routed
-through ExitLag's relays on Linux.
+Run the official ExitLag Windows client on **Linux** and **Apple Silicon Mac**
+with this unofficial, open-source compatibility bridge. ExitLag Bridge provides
+graphical installers, a Wine compatibility layer and native game-traffic routing.
+World of Warcraft Classic Era gameplay has been verified on both platforms;
+other games have the specific results listed below.
+
+[Project website](https://cheaux.github.io/exitlag-bridge/) ·
+[Download installers](https://github.com/Cheaux/exitlag-bridge/releases) ·
+[Install and uninstall](installers/README.md) ·
+[Setup FAQ](docs/faq.md) ·
+[Games tested](#games-tested) ·
+[Report a game](https://github.com/Cheaux/exitlag-bridge/issues/new?template=game-compatibility.yml)
 
 > **Not affiliated with, endorsed by, or supported by ExitLag.**
 > This project contains no ExitLag code and redistributes no ExitLag files.
 > You need the official client and your own valid account and subscription.
+
+## Install ExitLag Bridge on Linux or Mac
+
+| Platform | Download and start | Current scope |
+|---|---|---|
+| Ubuntu 22.04 / 24.04, x86_64 | Choose the matching `.deb` in [Releases](https://github.com/Cheaux/exitlag-bridge/releases), install it with the system package manager, then open **ExitLag Bridge**. | Graphical setup and game mappings; installer lifecycle checked on both Ubuntu versions. |
+| Other x86_64 Linux distributions | Portable `.tar.gz` plus the [documented dependencies](installers/README.md#linux). | Original Linux WoW gameplay verified; portable packages on other distributions remain unvalidated. |
+| Apple Silicon Mac, macOS 15+ | Install the `macos-arm64.pkg`, then open **ExitLag Bridge** in Applications. | Current routing is WoW-specific and IPv4 TCP only. Intel Macs are not supported by this binary. |
+
+First run opens ExitLag's official download page. Download its Windows `.exe`
+yourself, select it in the bridge, and complete the vendor wizard. Keep
+`C:\ExitLag`, leave **Launch ExitLag** unchecked, then sign in directly in the
+official dashboard. The bridge and native routing helper start through the
+packaged app; end users do not need a developer Terminal script.
+
+Mac installers are unsigned and not notarized. The bridge code is free under
+GPL-3.0-only; the official ExitLag service still requires your own active account
+and subscription. See the [setup FAQ](docs/faq.md) for Wine, Proton, the NDIS
+warning, administrator prompts and compatibility limits.
+
+## How ExitLag works on Linux and macOS
 
 ExitLag's Windows client normally intercepts game connections through a Windows
 filtering driver. This bridge supplies the interception and steering layer on
@@ -71,7 +101,7 @@ runtime licensing.
 
 ## Release status
 
-This is an experimental release candidate. The source-only repository excludes
+This is an experimental public prerelease. The source-only repository excludes
 prior development history and private network traces. See
 [compatibility and evidence](docs/compatibility.md) for user-verified Linux
 WoW gameplay, observed Mac gameplay, automated installer coverage and untested
@@ -92,8 +122,10 @@ vendor endorsement or legal approval.
 | ExitLag | the official client, installed by you into a Wine prefix |
 | Build | `clang-cl`, `lld-link`, `llvm-dlltool`, `llvm-readobj`, a C compiler, GNU make |
 
-Developed and verified on Arch Linux (kernel 7.2, nftables 1.1.7) with Wine
-11.17 Staging. Other distributions are untested. Other Wine versions may need the
+The original Linux gameplay setup was developed and verified on Arch Linux
+(kernel 7.2, nftables 1.1.7) with Wine 11.17 Staging. Packaged installer checks
+also pass on Ubuntu 22.04 and 24.04. These checks are separate from gameplay
+evidence in the tested-games table. Other Wine versions may need the
 crash-guard set re-checked — `tools/check-exitlag-abi.sh` tells you whether they
 do.
 

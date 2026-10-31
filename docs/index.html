@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ExitLag for Linux and Mac | Unofficial ExitLag Bridge</title>
+  <meta name="description" content="Run ExitLag on Linux and Apple Silicon Mac with an unofficial open-source Wine bridge. Download installers, check tested games, and follow setup guides.">
+  <meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
+  <meta name="theme-color" content="#182b28">
+  <link rel="canonical" href="https://cheaux.github.io/exitlag-bridge/">
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./site.css">
+  <link rel="sitemap" href="./sitemap.xml" type="application/xml">
+  <link rel="alternate" href="./llms.txt" type="text/plain" title="Project documentation index">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ExitLag Bridge">
+  <meta property="og:title" content="ExitLag for Linux and Mac — ExitLag Bridge">
+  <meta property="og:description" content="Unofficial open-source compatibility bridge. Linux and Apple Silicon Mac installers, tested-game results, and setup instructions. Requires your own ExitLag client and account.">
+  <meta property="og:url" content="https://cheaux.github.io/exitlag-bridge/">
+  <meta property="og:image" content="https://opengraph.githubassets.com/discovery/Cheaux/exitlag-bridge">
+  <meta property="og:image:alt" content="ExitLag Bridge public GitHub repository">
+  <meta name="twitter:card" content="summary_large_image">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "name": "ExitLag Bridge",
+    "alternateName": ["ExitLag for Linux", "ExitLag for Mac"],
+    "description": "Unofficial experimental open-source compatibility bridge for the official ExitLag Windows client on Linux and Apple Silicon macOS. Requires the separately installed official client and the user's own active account and subscription.",
+    "url": "https://cheaux.github.io/exitlag-bridge/",
+    "codeRepository": "https://github.com/Cheaux/exitlag-bridge",
+    "license": "https://github.com/Cheaux/exitlag-bridge/blob/main/LICENSE",
+    "programmingLanguage": ["C", "C++", "Python", "Swift"],
+    "runtimePlatform": "Linux x86_64 or Apple Silicon macOS 15+, with Wine",
+    "inLanguage": "en",
+    "isAccessibleForFree": true
+  }
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="wrap">
+    <header class="masthead">
+      <a class="brand" href="./" aria-label="ExitLag Bridge home"><img src="./favicon.svg" alt="" width="34" height="34">ExitLag Bridge</a>
+      <nav aria-label="Main navigation"><a href="#install">Install</a><a href="#games">Games tested</a><a href="#faq">FAQ</a><a href="https://github.com/Cheaux/exitlag-bridge">GitHub</a></nav>
+    </header>
+    <main id="main">
+      <div class="hero">
+        <p class="eyebrow">An unofficial, experimental compatibility project</p>
+        <h1>ExitLag for Linux<br>and Apple Silicon Mac.</h1>
+        <p class="lead">Use the official ExitLag Windows client through Wine, with a native bridge for game traffic. Graphical installers handle setup; your own ExitLag account handles the service.</p>
+        <div class="actions"><a class="button" href="https://github.com/Cheaux/exitlag-bridge/releases">Download installers</a><a href="https://github.com/Cheaux/exitlag-bridge">Read the source</a></div>
+        <p class="note">Free bridge code, GPL-3.0-only. Requires the official ExitLag client and an active subscription or trial. Not affiliated with, endorsed by, or supported by ExitLag.</p>
+      </div>
+      <section id="platforms" aria-labelledby="platform-heading">
+        <h2 id="platform-heading">Choose your platform</h2>
+        <div class="columns">
+          <div class="platform"><h3>Linux · x86_64</h3><p>Ubuntu 22.04 and 24.04 Debian packages, plus portable archives. Map a native executable or a Wine/Proton prefix to a game ExitLag recognizes.</p><p class="detail">WoW Classic Era gameplay verified with the original Linux bridge. Packaged installer lifecycle checks pass on both Ubuntu versions; other game results vary.</p></div>
+          <div class="platform"><h3>Mac · Apple Silicon</h3><p>A macOS 15+ installer with a graphical launcher and native routing helper. Open ExitLag Bridge to reach the official dashboard.</p><p class="detail">Current routing is WoW-specific and IPv4 TCP only. Live testing used macOS 27.2. Intel binaries are not supplied. Mac installers are unsigned and not notarized.</p></div>
+        </div>
+      </section>
+      <section id="install" aria-labelledby="install-heading">
+        <h2 id="install-heading">Install ExitLag Bridge</h2>
+        <ol>
+          <li>Choose your platform's package from <a href="https://github.com/Cheaux/exitlag-bridge/releases">GitHub Releases</a>. Install it and open <strong>ExitLag Bridge</strong>.</li>
+          <li>First run opens <a href="https://www.exitlag.com/download">ExitLag's official download page</a>. Download the Windows <code>.exe</code> yourself and select it in setup.</li>
+          <li>Review and complete the vendor wizard. Keep <code>C:\ExitLag</code> and uncheck <strong>Launch ExitLag</strong> at the end. Then sign in directly in the official dashboard.</li>
+          <li>Configure your game if needed, apply its routes in ExitLag, then establish a new game connection. The packaged bridge starts its routing helper through normal administrator authorization.</li>
+        </ol>
+        <p class="note">No proprietary installer or account data is bundled. The Windows NDIS driver warning <code>0x80004001</code> can be acknowledged because the native backend replaces that driver; other installer failures are not ignored.</p>
+        <p><a href="https://github.com/Cheaux/exitlag-bridge/blob/main/installers/README.md">Full installation, requirements and removal guide →</a></p>
+      </section>
+      <section id="games" aria-labelledby="games-heading">
+        <h2 id="games-heading">Games tested: what actually worked</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th scope="col">Game / platform</th><th scope="col">Result</th><th scope="col">Observed scope</th></tr></thead>
+          <tbody>
+            <tr><td>WoW Classic Era · Linux</td><td class="status">Working</td><td>Maintainer-verified gameplay with the original Linux bridge.</td></tr>
+            <tr><td>WoW Classic Era · Mac</td><td class="status">Working</td><td>Stable world gameplay with bidirectional relay traffic.</td></tr>
+            <tr><td>WoW Forever · Mac</td><td class="status">Partial</td><td>Relayed character selection only. World entry was unavailable before release.</td></tr>
+            <tr><td>Minecraft Java · Linux</td><td class="status">Unstable</td><td>Traffic relayed, but sessions disconnected.</td></tr>
+            <tr><td>Dota 2 / Tibia · Linux</td><td class="status">Detection only</td><td>Traffic recognized; working relay routing was not established.</td></tr>
+            <tr><td>Other games</td><td class="status">Untested</td><td>Community reports and pull requests are welcome.</td></tr>
+          </tbody>
+        </table></div>
+        <p class="note">Earlier Linux experiments were not all repeated with the new packaged installer. Dashboard recognition and synthetic installer checks alone do not establish gameplay compatibility.</p>
+        <p><a href="https://github.com/Cheaux/exitlag-bridge/blob/main/docs/compatibility.md">Full compatibility evidence</a> · <a href="https://github.com/Cheaux/exitlag-bridge/issues/new?template=game-compatibility.yml">Report a game</a></p>
+      </section>
+      <section id="how-it-works" aria-labelledby="routing-heading">
+        <h2 id="routing-heading">Your game, through the official ExitLag route</h2>
+        <p class="flow">Game ↔ native bridge ↔ official ExitLag client under Wine ↔ ExitLag relays ↔ game server</p>
+        <p>The native backend handles interception, process attribution and steering into the official client's local proxy. The official client performs account authentication, route selection and relay transport. The bridge does not independently implement ExitLag's remote route API or relay protocol.</p>
+      </section>
+      <section id="faq" class="faq" aria-labelledby="faq-heading">
+        <h2 id="faq-heading">ExitLag on Linux and Mac: common questions</h2>
+        <details open><summary>Does ExitLag work on Linux?</summary><p>WoW Classic Era gameplay has been verified with the original Linux bridge. The new packages provide a graphical setup and native routing backend, with installer checks on Ubuntu 22.04 and 24.04. Other games require their own compatibility evidence.</p></details>
+        <details open><summary>Can I use ExitLag on an Apple Silicon Mac?</summary><p>Yes, within the current experimental scope: macOS 15+ on Apple Silicon, with WoW-specific IPv4 TCP routing. Classic Era world gameplay and Forever character selection were verified. Intel, UDP and IPv6 routing are not supported by this Mac release.</p></details>
+        <details><summary>Is ExitLag Bridge free?</summary><p>The bridge's own code is free under GPL-3.0-only. The official ExitLag client and your own valid account with an active subscription or trial are still required. No accounts or service access bypass are supplied.</p></details>
+        <details><summary>Do I have to run a routing script every time?</summary><p>No developer Terminal script is needed for the packaged app. Open ExitLag Bridge, apply the game's route in the official dashboard, and connect the game. The native helper starts through the installed app and normal administrator authorization.</p></details>
+        <details><summary>Can it route Proton or other Wine prefixes?</summary><p>The Linux bridge supports exact native-executable and Wine/Proton-prefix mappings. Use Configure games and the Windows identity expected by ExitLag. A prefix mapping applies to the whole prefix. This capability is not a guarantee that every game's transport will work.</p></details>
+        <details><summary>Will it reduce my ping?</summary><p>There is no guaranteed latency reduction. Relay selection, server location and local network conditions affect results. Compare the same game's latency on the same server under similar conditions.</p></details>
+        <details><summary>Is the commercial NetFilter SDK included?</summary><p>No commercial SDK implementation or vendor filtering driver is bundled. The bridge supplies its own compatibility shim and native backend. The incomplete original authoring record for some interface declarations is documented in the repository's third-party and provenance notes.</p></details>
+        <p class="link-list"><a href="https://github.com/Cheaux/exitlag-bridge/blob/main/docs/faq.md">Complete setup FAQ</a><a href="https://github.com/Cheaux/exitlag-bridge/blob/main/CONTRIBUTING.md">Contributing</a><a href="./llms.txt">Plain-text documentation index</a></p>
+      </section>
+    </main>
+    <footer>
+      <p><strong>ExitLag Bridge</strong> · Unofficial open-source project · <a href="https://github.com/Cheaux/exitlag-bridge/blob/main/LICENSE">GPL-3.0-only</a></p>
+      <p>Third-party components retain their own licenses. <a href="https://github.com/Cheaux/exitlag-bridge/blob/main/THIRD_PARTY.md">Third-party and interface provenance</a> · <a href="https://github.com/Cheaux/exitlag-bridge/issues">Issues</a></p>
+      <p>This is an experimental release. Sleep/reboot recovery, additional machines and future client versions need further validation. No analytics, tracking scripts or sign-in are used on this documentation page.</p>
+    </footer>
+  </div>
+</body>
+</html>
