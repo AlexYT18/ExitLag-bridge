@@ -1,0 +1,79 @@
+name: Shared Linux installer compatibility
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  PORTABLE_SHA256: f53ad08c2e1283861df1fa8f76af07d76053c089771b9ce05904fc6673b57969
+jobs:
+  ubuntu:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download the pinned shared Linux installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p build/shared-linux
+          url="$(gh api repos/Cheaux/exitlag-bridge/releases/assets/693786646 --jq .browser_download_url)"
+          case "$url" in
+            https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/*) ;;
+            *) exit 1 ;;
+          esac
+          curl --fail --location --retry 2 --output build/shared-linux/installer.tar.gz "$url"
+          echo "$PORTABLE_SHA256  build/shared-linux/installer.tar.gz" | sha256sum --check -
+          tar -xzf build/shared-linux/installer.tar.gz -C build/shared-linux
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          audio=libasound2
+          tls=libgnutls30
+          if apt-cache show libasound2t64 >/dev/null 2>&1; then audio=libasound2t64; fi
+          if apt-cache show libgnutls30t64 >/dev/null 2>&1; then tls=libgnutls30t64; fi
+          sudo apt-get install -y python3 python3-tk nftables libmnl0 policykit-1 curl ca-certificates libfreetype6 "$audio" "$tls" libx11-6 libxext6 libxrender1 libxrandr2 libxcursor1 libxi6 libxinerama1 libxxf86vm1 libgl1 libvulkan1 fontconfig fonts-liberation libdbus-1-3 libudev1 xvfb xauth
+      - name: Install the portable archive
+        run: sudo bash build/shared-linux/exitlag-bridge-0.4.0-linux-x86_64/install.sh
+      - name: Check first-run UI and fresh Wine/WMI
+        run: |
+          xvfb-run -a /usr/bin/python3 tests/test_desktop_ui.py /usr/local/lib/exitlag-bridge
+          xvfb-run -a /usr/bin/python3 tests/installer_fresh_runtime.py /usr/local/lib/exitlag-bridge/installers/payloads
+      - name: Check routing and cleanup in an isolated namespace
+        run: |
+          sudo modprobe nfnetlink_queue
+          sudo unshare --net runuser -u "$USER" -- /usr/bin/python3 tests/test_installed_routing.py /usr/local/lib/exitlag-bridge
+      - name: Remove the portable installation and preserve user data
+        run: |
+          marker="$HOME/.local/share/exitlag-bridge/portable-test-marker"
+          mkdir -p "$(dirname "$marker")"
+          touch "$marker"
+          sudo bash build/shared-linux/exitlag-bridge-0.4.0-linux-x86_64/uninstall.sh
+          test -f "$marker"
+          test ! -e /usr/local/lib/exitlag-bridge
+  arch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download the same pinned archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p build/shared-linux
+          url="$(gh api repos/Cheaux/exitlag-bridge/releases/assets/693786646 --jq .browser_download_url)"
+          case "$url" in
+            https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/*) ;;
+            *) exit 1 ;;
+          esac
+          curl --fail --location --retry 2 --output build/shared-linux/installer.tar.gz "$url"
+          echo "$PORTABLE_SHA256  build/shared-linux/installer.tar.gz" | sha256sum --check -
+      - name: Check Arch userspace with the portable installer
+        run: |
+          sudo modprobe nfnetlink_queue
+          docker pull archlinux:base
+          docker image inspect archlinux:base --format '{{json .RepoDigests}}'
+          docker run --rm --privileged --env EXITLAG_PORTABLE_CI=1 --volume "$PWD:/workspace:ro" archlinux:base /bin/bash /workspace/tests/portable-arch-container.sh
