@@ -13,7 +13,7 @@ Use the linked compatibility record for precise results.
 
 - [Project overview](https://cheaux.github.io/exitlag-bridge/): Supported platforms, setup, tested games and routing architecture.
 - [Repository README](https://github.com/Cheaux/exitlag-bridge/blob/main/README.md): Source project overview and developer instructions.
-- [Installers](https://github.com/Cheaux/exitlag-bridge/releases): Experimental Linux x86_64 and macOS arm64 packages, matching source and checksums.
+- [Installers](https://cheaux.github.io/exitlag-bridge/#downloads): Three choices: Apple Silicon Mac, Arch/other Linux portable, or one Ubuntu x86_64 package for both 22.04 and 24.04. Matching source and checksums are in GitHub Releases.
 - [Install and uninstall guide](https://github.com/Cheaux/exitlag-bridge/blob/main/installers/README.md): Dependencies, vendor wizard, administrator helper and account-preserving removal.
 - [Arch Linux setup](https://github.com/Cheaux/exitlag-bridge/blob/main/docs/arch-linux.md): Portable installer, pacman dependencies and maintainer-verified Arch gameplay scope.
 - [Setup FAQ](https://github.com/Cheaux/exitlag-bridge/blob/main/docs/faq.md): Linux, Mac, Wine, Proton, account requirements and common setup questions.

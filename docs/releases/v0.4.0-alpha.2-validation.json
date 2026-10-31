@@ -71,5 +71,22 @@
     "filename": "exitlag-bridge-0.4.0-alpha.2-linux-x86_64.tar.gz",
     "build_baseline": "Ubuntu 22.04",
     "sha256": "f53ad08c2e1283861df1fa8f76af07d76053c089771b9ce05904fc6673b57969"
+  },
+  "shared_ubuntu_installer": {
+    "filename": "exitlag-bridge_0.4.0_amd64.deb",
+    "sha256": "c51a6e4b111bdd7685dd05f56cf8f92238a1f1509d47412c93a6df1f027ea845",
+    "build_baseline": "Ubuntu 22.04",
+    "same_binary_verified_on": [
+      "Ubuntu 22.04",
+      "Ubuntu 24.04"
+    ],
+    "ci_url": "https://github.com/Cheaux/exitlag-bridge/actions/runs/41243585011",
+    "checks": [
+      "apt_install_declared_dependencies",
+      "installed_first_run_UI",
+      "fresh_Wine_WMI",
+      "installed_routing_and_cleanup",
+      "package_removal_preserves_user_data"
+    ]
   }
 }

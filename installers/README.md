@@ -1,7 +1,7 @@
 # Install ExitLag Bridge
 
 [Choose your platform's download](https://cheaux.github.io/exitlag-bridge/#downloads).
-Use the Mac installer, the `.deb` matching your Ubuntu version, or the shared
+Use the Mac installer, the shared Ubuntu 22.04/24.04 `.deb`, or the shared
 Linux portable installer for Arch Linux and other x86_64 distributions.
 
 The bridge is GPL-3.0-only. ExitLag is downloaded separately from
@@ -53,15 +53,17 @@ are ignored by Git. The builder's own Python version may need the standard
 The packaged beta supports **x86_64**. **Arch Linux** is the maintainer's verified
 WoW gameplay platform; use the [Arch setup guide](../docs/arch-linux.md).
 
-For Ubuntu, download the matching [22.04 package](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge_0.4.0_ubuntu22.04_amd64.deb)
-or [24.04 package](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge_0.4.0_ubuntu24.04_amd64.deb),
-then install it with your graphical package manager. For example, on Ubuntu 22.04:
+For Ubuntu 22.04 and 24.04, download the **same [Ubuntu package](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge_0.4.0_amd64.deb)**,
+then install it with your graphical package manager or run:
 
 ```sh
-sudo apt install ./exitlag-bridge_0.4.0_ubuntu22.04_amd64.deb
+sudo apt install ./exitlag-bridge_0.4.0_amd64.deb
 ```
 
-Use the `ubuntu24.04` filename for Ubuntu 24.04.
+This is the Ubuntu 22.04 build, verified unchanged on both Ubuntu versions for
+installation, first-run UI, fresh Wine/WMI, native routing cleanup and
+account-preserving removal. See the
+[shared package check](https://github.com/Cheaux/exitlag-bridge/actions/workflows/ubuntu-package-compatibility.yml).
 This installs desktop integration and declares system runtime dependencies.
 Open **ExitLag Bridge** from the applications menu as your normal user.
 

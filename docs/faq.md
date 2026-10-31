@@ -9,7 +9,7 @@ or read the [full installation guide](../installers/README.md).
 
 World of Warcraft Classic Era gameplay has been verified on **Arch Linux** with
 the original bridge. Use the [Arch Linux setup guide](arch-linux.md) and shared
-portable installer, or a `.deb` matching your Ubuntu release. The packaged
+portable installer, or the shared `.deb` for Ubuntu 22.04 and 24.04. The packaged
 x86_64 Linux app provides graphical setup, exact native
 executable or Wine/Proton-prefix mappings, and a privileged nftables/NFQUEUE
 backend. Ubuntu 22.04 and 24.04 installer checks pass. Game support depends on the
