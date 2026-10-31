@@ -27,8 +27,8 @@ other games have the specific results listed below.
 First open shows **Download from ExitLag** and **Choose installer…** buttons.
 Use the download button to open the official site, then use the file picker to
 select the Windows `.exe` you downloaded. Complete the vendor wizard. Keep
-`C:\ExitLag`, leave **Launch ExitLag** unchecked, then sign in directly in the
-official dashboard. The bridge and native routing helper start through the
+`C:\ExitLag` and leave **Launch ExitLag** unchecked. Sign in directly when you
+open the official dashboard. The bridge and native routing helper start through the
 packaged app; end users do not need a developer Terminal script.
 
 Mac installers are unsigned and not notarized. The bridge code is free under
