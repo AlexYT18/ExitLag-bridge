@@ -21,13 +21,12 @@ other games have the specific results listed below.
 
 | Platform | Download and start | Current scope |
 |---|---|---|
-| **Arch Linux, x86_64** | [Download Linux portable installer](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge-0.4.0-alpha.2-linux-x86_64.tar.gz) and follow the [Arch setup guide](docs/arch-linux.md). | **WoW Classic Era gameplay verified by the maintainer on Arch Linux** with the original bridge. |
-| **Ubuntu 22.04 / 24.04, x86_64** | [Download the Ubuntu installer](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge_0.4.0_amd64.deb), install it, then open **ExitLag Bridge**. | One package, checked on both Ubuntu versions. |
-| Other x86_64 Linux distributions | [Linux portable installer](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge-0.4.0-alpha.2-linux-x86_64.tar.gz) plus the [documented dependencies](installers/README.md#linux). | Additional distributions need their own compatibility reports. |
+| **Linux, x86_64 — Arch and Ubuntu** | [Download the Linux installer](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge-0.4.0-alpha.2-linux-x86_64.tar.gz), then follow the [shared Linux setup guide](docs/linux.md). | The same archive passes installation checks on Ubuntu 22.04, Ubuntu 24.04 and Arch userspace. **Real WoW gameplay is maintainer-verified on Arch.** |
 | Apple Silicon Mac, macOS 15+ | [Download the Mac installer](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/ExitLag-Bridge-0.4.0-alpha.2-macos-arm64.pkg), install it, then open **ExitLag Bridge** in Applications. | Current routing is WoW-specific and IPv4 TCP only. Intel Macs are not supported by this binary. |
 
-First run opens ExitLag's official download page. Download its Windows `.exe`
-yourself, select it in the bridge, and complete the vendor wizard. Keep
+First open shows **Download from ExitLag** and **Choose installer…** buttons.
+Use the download button to open the official site, then use the file picker to
+select the Windows `.exe` you downloaded. Complete the vendor wizard. Keep
 `C:\ExitLag`, leave **Launch ExitLag** unchecked, then sign in directly in the
 official dashboard. The bridge and native routing helper start through the
 packaged app; end users do not need a developer Terminal script.
@@ -36,6 +35,10 @@ Mac installers are unsigned and not notarized. The bridge code is free under
 GPL-3.0-only; the official ExitLag service still requires your own active account
 and subscription. See the [setup FAQ](docs/faq.md) for Wine, Proton, the NDIS
 warning, administrator prompts and compatibility limits.
+
+Linux dependencies use `apt` on Ubuntu or `pacman` on Arch; the installer archive
+is the same. An [optional Ubuntu `.deb`](installers/README.md#optional-ubuntu-package)
+remains available for package-manager installations.
 
 ## How ExitLag works on Linux and macOS
 

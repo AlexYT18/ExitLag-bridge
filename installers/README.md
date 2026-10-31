@@ -1,15 +1,17 @@
 # Install ExitLag Bridge
 
 [Choose your platform's download](https://cheaux.github.io/exitlag-bridge/#downloads).
-Use the Mac installer, the shared Ubuntu 22.04/24.04 `.deb`, or the shared
-Linux portable installer for Arch Linux and other x86_64 distributions.
+Choose **Mac** or **Linux**. The shared Linux archive works on Arch and Ubuntu;
+the optional Ubuntu `.deb` is listed under advanced downloads.
 
 The bridge is GPL-3.0-only. ExitLag is downloaded separately from
 [its official download page](https://www.exitlag.com/download). We do not ship,
 mirror, automatically download, or silently accept terms for its Windows client.
 
-Both desktop setup flows open that page, accept a local `.exe`, prepare a
-private Wine runtime, and run the vendor wizard interactively. Review its terms,
+Both desktop setup windows have a **Download from ExitLag** button that opens
+the official page and a **Choose installer…** button that opens a `.exe` file
+picker. After selecting your download, setup prepares a private Wine runtime and
+runs the vendor wizard interactively. Review its terms,
 use the proposed `C:\ExitLag` destination, and leave **Launch ExitLag** unchecked.
 Setup stops on vendor failure, missing files, or an unsupported `nfapi` interface.
 Sign in directly in the official client after setup completes.
@@ -50,8 +52,20 @@ are ignored by Git. The builder's own Python version may need the standard
 
 ## Linux
 
-The packaged beta supports **x86_64**. **Arch Linux** is the maintainer's verified
-WoW gameplay platform; use the [Arch setup guide](../docs/arch-linux.md).
+The shared installer supports **x86_64**. Download the
+[Linux archive](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge-0.4.0-alpha.2-linux-x86_64.tar.gz)
+and follow the [same Linux setup guide](../docs/linux.md) on Arch Linux or Ubuntu
+22.04/24.04. It installs under `/usr/local/lib/exitlag-bridge`; system dependencies
+use `apt` on Ubuntu or `pacman` on Arch. **Arch Linux** is the maintainer's
+verified WoW gameplay platform.
+
+The exact archive passed installation, first-run UI, fresh Wine/WMI, helper
+cleanup and removal checks on both Ubuntu versions and in Arch userspace in a
+disposable Docker container. The container uses the CI host's Ubuntu kernel;
+actual Arch gameplay evidence comes from the maintainer's separate test.
+[Shared Linux installer verification](https://github.com/Cheaux/exitlag-bridge/actions/runs/41244802664).
+
+### Optional Ubuntu package
 
 For Ubuntu 22.04 and 24.04, download the **same [Ubuntu package](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge_0.4.0_amd64.deb)**,
 then install it with your graphical package manager or run:
@@ -67,17 +81,11 @@ account-preserving removal. See the
 This installs desktop integration and declares system runtime dependencies.
 Open **ExitLag Bridge** from the applications menu as your normal user.
 
-The [shared Linux portable archive](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge-0.4.0-alpha.2-linux-x86_64.tar.gz)
-contains `install.sh`, `uninstall.sh` and the program tree.
-Install the listed dependencies using your distribution's package manager, then
-run `sudo bash ./install.sh`. It installs under `/usr/local/lib/exitlag-bridge`.
-Arch gameplay evidence comes from the original bridge. The new packaged
-installer's automated lifecycle checks run on Ubuntu 22.04/24.04; a fresh packaged
-install-to-gameplay cycle on Arch has not been repeated. The shared portable
-binary uses the Ubuntu 22.04 build as its compatibility baseline.
-`nftables`, NFQUEUE support, libmnl, Python 3.10+ with Tk, polkit with a desktop
-agent, curl, certificates and the normal Wine graphics/audio libraries are needed.
-A Wayland session needs XWayland for the current Wine client.
+Choose one installation method. Remove a `.deb` installation with your package
+manager before switching to the shared portable installer; account data is
+preserved. The shared portable archive contains its own `uninstall.sh`.
+
+### Launch and removal
 
 Use **Configure games** to select the actual native executable or the game's
 Wine/Proton prefix and enter the Windows executable identity recognized by

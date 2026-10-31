@@ -8,8 +8,8 @@ or read the [full installation guide](../installers/README.md).
 ## Does ExitLag work on Linux?
 
 World of Warcraft Classic Era gameplay has been verified on **Arch Linux** with
-the original bridge. Use the [Arch Linux setup guide](arch-linux.md) and shared
-portable installer, or the shared `.deb` for Ubuntu 22.04 and 24.04. The packaged
+the original bridge. Use the [same Linux installer and setup guide](linux.md)
+for Arch Linux and Ubuntu 22.04/24.04. The packaged
 x86_64 Linux app provides graphical setup, exact native
 executable or Wine/Proton-prefix mappings, and a privileged nftables/NFQUEUE
 backend. Ubuntu 22.04 and 24.04 installer checks pass. Game support depends on the
@@ -34,7 +34,8 @@ Third-party components retain their existing licenses.
 ## Where do I get the Windows installer?
 
 Download it yourself from [ExitLag's official page](https://www.exitlag.com/download).
-First-run setup opens that page and lets you select the local `.exe`. Complete
+First-run setup offers **Download from ExitLag** to open that page and
+**Choose installer…** to open a file picker for the local `.exe`. Complete
 the vendor wizard, review its terms, keep `C:\ExitLag`, and uncheck **Launch
 ExitLag** at the end. Sign in directly in the official dashboard afterward.
 The bridge does not bundle, mirror or automatically download the proprietary client.

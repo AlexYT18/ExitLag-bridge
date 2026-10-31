@@ -20,6 +20,11 @@ cover clean Wine/WMI setup, installed first-run UI, ownership checks, UID-scoped
 routing startup, removed/expired leases, parent-exit cleanup and account-preserving
 removal. CI uses no official client or account.
 
+The same Linux portable archive now also passes these checks on both Ubuntu
+versions and in Arch userspace in a disposable Docker container. The Arch
+container uses an Ubuntu CI host kernel; it is not a native Arch kernel or live
+gameplay test. [Portable installer checks](https://github.com/Cheaux/exitlag-bridge/actions/runs/41244802664).
+
 Minecraft, Dota 2 and Tibia results come from earlier native Linux experiments.
 Their source reports establish the scope above, not current-version support.
 The Minecraft tests carried real relay traffic and then disconnected; detection

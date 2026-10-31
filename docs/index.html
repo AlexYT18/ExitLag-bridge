@@ -57,15 +57,14 @@
         <p>Choose one installer. Setup instructions are linked underneath each download.</p>
         <div class="download-grid">
           <div class="download-option"><h3>Mac · Apple Silicon</h3><p>macOS 15+ · ARM64 · unsigned beta</p><a class="button" href="https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/ExitLag-Bridge-0.4.0-alpha.2-macos-arm64.pkg">Download Mac installer</a><a href="https://github.com/Cheaux/exitlag-bridge/blob/main/installers/README.md#macos">Mac setup guide</a></div>
-          <div class="download-option"><h3>Arch Linux</h3><p>x86_64 · shared portable installer</p><a class="button" href="https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge-0.4.0-alpha.2-linux-x86_64.tar.gz">Download for Arch Linux</a><a href="https://github.com/Cheaux/exitlag-bridge/blob/main/docs/arch-linux.md">Arch dependencies and setup</a></div>
-          <div class="download-option"><h3>Ubuntu 22.04 / 24.04</h3><p>x86_64 / AMD64 · one package for both</p><a class="button" href="https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge_0.4.0_amd64.deb">Download for Ubuntu</a><a href="https://github.com/Cheaux/exitlag-bridge/blob/main/installers/README.md#linux">Ubuntu setup guide</a></div>
+          <div class="download-option"><h3>Linux · Arch and Ubuntu</h3><p>x86_64 · one shared installer archive</p><a class="button" href="https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge-0.4.0-alpha.2-linux-x86_64.tar.gz">Download Linux installer</a><a href="https://github.com/Cheaux/exitlag-bridge/blob/main/docs/linux.md">Linux dependencies and setup</a></div>
         </div>
-        <p class="note">Other x86_64 Linux distributions can try the shared portable installer with their own system dependencies. <a href="https://github.com/Cheaux/exitlag-bridge/releases/tag/v0.4.0-alpha.2">Uninstaller, source code and checksums</a>.</p>
+        <p class="note">Linux dependencies use apt on Ubuntu or pacman on Arch. Other x86_64 distributions need their own compatibility reports. <a href="https://github.com/Cheaux/exitlag-bridge/releases/tag/v0.4.0-alpha.2">Advanced downloads: optional Ubuntu package, uninstaller, source and checksums</a>.</p>
       </section>
       <section id="platforms" aria-labelledby="platform-heading">
         <h2 id="platform-heading">Platform support</h2>
         <div class="columns">
-          <div class="platform"><h3>Linux · Arch and Ubuntu</h3><p>Arch Linux and other x86_64 distributions use the shared portable archive. Ubuntu 22.04 and 24.04 use one shared Debian package.</p><p class="detail"><strong>WoW Classic Era gameplay was verified on Arch Linux</strong> with the original bridge. The shared Ubuntu package passes installer lifecycle checks on both Ubuntu versions; other game results vary.</p></div>
+          <div class="platform"><h3>Linux · Arch and Ubuntu</h3><p>Arch Linux and Ubuntu 22.04/24.04 use the same archive and installation script. Automated checks pass on both Ubuntu versions and Arch userspace in a container.</p><p class="detail"><strong>Real WoW Classic Era gameplay was verified on Arch Linux</strong> with the original bridge. The Arch container uses the CI host kernel; it is separate from that gameplay evidence.</p></div>
           <div class="platform"><h3>Mac · Apple Silicon</h3><p>A macOS 15+ installer with a graphical launcher and native routing helper. Open ExitLag Bridge to reach the official dashboard.</p><p class="detail">Current routing is WoW-specific and IPv4 TCP only. Live testing used macOS 27.2. Intel binaries are not supplied. Mac installers are unsigned and not notarized.</p></div>
         </div>
       </section>
@@ -73,9 +72,9 @@
         <h2 id="install-heading">Install ExitLag Bridge</h2>
         <ol>
           <li>Choose your platform's package <a href="#downloads">above</a>, follow its setup guide, and open <strong>ExitLag Bridge</strong>.</li>
-          <li>First run opens <a href="https://www.exitlag.com/download">ExitLag's official download page</a>. Download the Windows <code>.exe</code> yourself and select it in setup.</li>
+          <li>Open the bridge and click <strong>Download from ExitLag</strong> to visit the <a href="https://www.exitlag.com/download">official download page</a>. Download the Windows <code>.exe</code>, then click <strong>Choose installer…</strong> and select it in the file picker.</li>
           <li>Review and complete the vendor wizard. Keep <code>C:\ExitLag</code> and uncheck <strong>Launch ExitLag</strong> at the end. Then sign in directly in the official dashboard.</li>
-          <li>Configure your game if needed, apply its routes in ExitLag, then establish a new game connection. The packaged bridge starts its routing helper through normal administrator authorization.</li>
+          <li>On Linux, use <strong>Configure games…</strong> and <strong>Launch ExitLag</strong>. Sign in directly in the official dashboard, apply your game's route, then make a new game connection. The native helper uses normal administrator authorization.</li>
         </ol>
         <p class="note">No proprietary installer or account data is bundled. The Windows NDIS driver warning <code>0x80004001</code> can be acknowledged because the native backend replaces that driver; other installer failures are not ignored.</p>
         <p><a href="https://github.com/Cheaux/exitlag-bridge/blob/main/installers/README.md">Full installation, requirements and removal guide →</a></p>

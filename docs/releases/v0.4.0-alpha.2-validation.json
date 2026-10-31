@@ -88,5 +88,24 @@
       "installed_routing_and_cleanup",
       "package_removal_preserves_user_data"
     ]
+  },
+  "shared_linux_installer": {
+    "filename": "exitlag-bridge-0.4.0-alpha.2-linux-x86_64.tar.gz",
+    "sha256": "f53ad08c2e1283861df1fa8f76af07d76053c089771b9ce05904fc6673b57969",
+    "same_archive_verified_on": [
+      "Ubuntu 22.04",
+      "Ubuntu 24.04",
+      "Arch userspace in official disposable Docker image"
+    ],
+    "arch_kernel": "Ubuntu CI host kernel; native Arch gameplay evidence remains separate",
+    "ci_url": "https://github.com/Cheaux/exitlag-bridge/actions/runs/41244802664",
+    "checks": [
+      "portable_install",
+      "installed_first_run_UI",
+      "fresh_Wine_WMI",
+      "installed_routing_and_cleanup",
+      "portable_removal_preserves_user_data"
+    ],
+    "vendor_install_login_gameplay": "not_run_in_CI"
   }
 }
