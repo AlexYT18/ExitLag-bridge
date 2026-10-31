@@ -1,0 +1,75 @@
+{
+  "source_commit": "ff60083724b8e9624c07fc93e668af079f8be90b",
+  "release": "v0.4.0-alpha.2",
+  "status": "experimental",
+  "ci_url": "https://github.com/Cheaux/exitlag-bridge/actions/runs/41146234819",
+  "source_privacy_ci_url": "https://github.com/Cheaux/exitlag-bridge/actions/runs/41146234840",
+  "linux_ubuntu_22_04": "all_installer_checks_passed",
+  "linux_ubuntu_24_04": "all_installer_checks_passed",
+  "linux_unit_suites": {
+    "passed": 9,
+    "skipped_client_dependent": 2
+  },
+  "mac_bridge_tests": 33,
+  "shared_installer_tests": 13,
+  "mac_distribution_safeguards": 4,
+  "source_audit_tests": 4,
+  "discovery_regressions": 3,
+  "linux_gameplay": "maintainer_verified_WoW_Classic_Era_on_Arch_Linux_with_original_Linux_bridge",
+  "new_linux_gui_install_login_gameplay_cycle": "not_manually_retested",
+  "mac_gameplay": {
+    "WoW_Classic_Era": "working_world_traffic",
+    "WoW_Forever": "character_selection_only"
+  },
+  "other_recorded_tests": {
+    "Minecraft_Java_Linux": "unstable_relayed_sessions",
+    "Dota_2_Linux": "detection_only",
+    "Tibia_Linux": "detection_only"
+  },
+  "mac_clean_vendor_wizard": "passed",
+  "mac_repeat_setup": "passed",
+  "mac_account_preserving_removal": "passed",
+  "mac_package_architecture": "arm64",
+  "mac_package_signing": "unsigned_not_notarized",
+  "official_client_bundled": false,
+  "commercial_sdk_implementation_bundled": false,
+  "source_privacy_audit": {
+    "committed_files": 171,
+    "reachable_commits": 10,
+    "findings": 0,
+    "all_reachable_source_blobs": {
+      "checked": 193,
+      "findings": 0
+    }
+  },
+  "mac_expanded_package_privacy_scan": {
+    "files": 1712,
+    "personal_data_matches": 0
+  },
+  "release_archive_checks": {
+    "22.04": {
+      "checksums": "passed",
+      "portable_files_scanned": 52,
+      "deb_members_checked": 52
+    },
+    "24.04": {
+      "checksums": "passed",
+      "portable_files_scanned": 52,
+      "deb_members_checked": 52
+    }
+  },
+  "limitations": [
+    "Mac_WoW_only_IPv4_TCP",
+    "Forever_world_not_available_for_test",
+    "Intel_Mac_not_built",
+    "sleep_reboot_recovery_not_validated",
+    "other_games_not_proven"
+  ],
+  "interface_provenance": "incomplete_original_authoring_record_documented_no_legal_clearance_claimed",
+  "record_scope": "Original alpha.2 binary validation snapshot; download presentation was simplified afterward without changing retained binaries.",
+  "portable_download": {
+    "filename": "exitlag-bridge-0.4.0-alpha.2-linux-x86_64.tar.gz",
+    "build_baseline": "Ubuntu 22.04",
+    "sha256": "f53ad08c2e1283861df1fa8f76af07d76053c089771b9ce05904fc6673b57969"
+  }
+}

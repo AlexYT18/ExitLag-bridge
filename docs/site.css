@@ -29,6 +29,11 @@ p { margin: 0 0 18px; }
 .platform { border-left: 3px solid var(--line); padding-left: 22px; }
 .platform p:last-child { margin-bottom: 0; }
 .platform .detail { font-size: .9rem; color: var(--muted); }
+.download-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin: 26px 0 20px; }
+.download-option { padding: 24px; border: 1px solid var(--line); border-radius: 5px; }
+.download-option p { color: var(--muted); font-size: .9rem; }
+.download-option .button { display: block; width: fit-content; margin-bottom: 15px; }
+.download-option > a:last-child { font-size: .88rem; }
 ol { margin: 0; padding-left: 24px; }
 li { padding-left: 5px; margin: 0 0 12px; }
 code { font-size: .88em; background: #e9ece3; padding: .1em .3em; border-radius: 3px; overflow-wrap: anywhere; }
@@ -52,6 +57,7 @@ footer p { margin-bottom: 10px; max-width: 850px; }
   nav { gap: 18px; }
   .hero { padding: 48px 0 38px; }
   .columns { grid-template-columns: 1fr; gap: 30px; }
+  .download-grid { grid-template-columns: 1fr; }
   section { padding: 34px 0; }
   table { font-size: .85rem; }
 }

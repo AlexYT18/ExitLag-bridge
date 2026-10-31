@@ -42,27 +42,38 @@
   <div class="wrap">
     <header class="masthead">
       <a class="brand" href="./" aria-label="ExitLag Bridge home"><img src="./favicon.svg" alt="" width="34" height="34">ExitLag Bridge</a>
-      <nav aria-label="Main navigation"><a href="#install">Install</a><a href="#games">Games tested</a><a href="#faq">FAQ</a><a href="https://github.com/Cheaux/exitlag-bridge">GitHub</a></nav>
+      <nav aria-label="Main navigation"><a href="#downloads">Downloads</a><a href="#install">Install</a><a href="#games">Games tested</a><a href="#faq">FAQ</a><a href="https://github.com/Cheaux/exitlag-bridge">GitHub</a></nav>
     </header>
     <main id="main">
       <div class="hero">
         <p class="eyebrow">An unofficial, experimental compatibility project</p>
         <h1>ExitLag for Linux<br>and Apple Silicon Mac.</h1>
         <p class="lead">Use the official ExitLag Windows client through Wine, with a native bridge for game traffic. Graphical installers handle setup; your own ExitLag account handles the service.</p>
-        <div class="actions"><a class="button" href="https://github.com/Cheaux/exitlag-bridge/releases">Download installers</a><a href="https://github.com/Cheaux/exitlag-bridge">Read the source</a></div>
+        <div class="actions"><a class="button" href="#downloads">Choose your download</a><a href="https://github.com/Cheaux/exitlag-bridge">Read the source</a></div>
         <p class="note">Free bridge code, GPL-3.0-only. Requires the official ExitLag client and an active subscription or trial. Not affiliated with, endorsed by, or supported by ExitLag.</p>
       </div>
+      <section id="downloads" aria-labelledby="downloads-heading">
+        <h2 id="downloads-heading">Download for your system</h2>
+        <p>Choose one installer. Setup instructions are linked underneath each download.</p>
+        <div class="download-grid">
+          <div class="download-option"><h3>Mac · Apple Silicon</h3><p>macOS 15+ · ARM64 · unsigned beta</p><a class="button" href="https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/ExitLag-Bridge-0.4.0-alpha.2-macos-arm64.pkg">Download Mac installer</a><a href="https://github.com/Cheaux/exitlag-bridge/blob/main/installers/README.md#macos">Mac setup guide</a></div>
+          <div class="download-option"><h3>Arch Linux</h3><p>x86_64 · shared portable installer</p><a class="button" href="https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge-0.4.0-alpha.2-linux-x86_64.tar.gz">Download for Arch Linux</a><a href="https://github.com/Cheaux/exitlag-bridge/blob/main/docs/arch-linux.md">Arch dependencies and setup</a></div>
+          <div class="download-option"><h3>Ubuntu 22.04</h3><p>x86_64 / AMD64 · Debian package</p><a class="button" href="https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge_0.4.0_ubuntu22.04_amd64.deb">Download for Ubuntu 22.04</a><a href="https://github.com/Cheaux/exitlag-bridge/blob/main/installers/README.md#linux">Ubuntu setup guide</a></div>
+          <div class="download-option"><h3>Ubuntu 24.04</h3><p>x86_64 / AMD64 · Debian package</p><a class="button" href="https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge_0.4.0_ubuntu24.04_amd64.deb">Download for Ubuntu 24.04</a><a href="https://github.com/Cheaux/exitlag-bridge/blob/main/installers/README.md#linux">Ubuntu setup guide</a></div>
+        </div>
+        <p class="note">Other x86_64 Linux distributions can try the shared portable installer with their own system dependencies. <a href="https://github.com/Cheaux/exitlag-bridge/releases/tag/v0.4.0-alpha.2">Uninstaller, source code and checksums</a>.</p>
+      </section>
       <section id="platforms" aria-labelledby="platform-heading">
-        <h2 id="platform-heading">Choose your platform</h2>
+        <h2 id="platform-heading">Platform support</h2>
         <div class="columns">
-          <div class="platform"><h3>Linux · x86_64</h3><p>Ubuntu 22.04 and 24.04 Debian packages, plus portable archives. Map a native executable or a Wine/Proton prefix to a game ExitLag recognizes.</p><p class="detail">WoW Classic Era gameplay verified with the original Linux bridge. Packaged installer lifecycle checks pass on both Ubuntu versions; other game results vary.</p></div>
+          <div class="platform"><h3>Linux · Arch and Ubuntu</h3><p>Arch Linux and other x86_64 distributions use the shared portable archive. Ubuntu 22.04 and 24.04 have dedicated Debian packages.</p><p class="detail"><strong>WoW Classic Era gameplay was verified on Arch Linux</strong> with the original bridge. Packaged installer lifecycle checks pass on both Ubuntu versions; other game results vary.</p></div>
           <div class="platform"><h3>Mac · Apple Silicon</h3><p>A macOS 15+ installer with a graphical launcher and native routing helper. Open ExitLag Bridge to reach the official dashboard.</p><p class="detail">Current routing is WoW-specific and IPv4 TCP only. Live testing used macOS 27.2. Intel binaries are not supplied. Mac installers are unsigned and not notarized.</p></div>
         </div>
       </section>
       <section id="install" aria-labelledby="install-heading">
         <h2 id="install-heading">Install ExitLag Bridge</h2>
         <ol>
-          <li>Choose your platform's package from <a href="https://github.com/Cheaux/exitlag-bridge/releases">GitHub Releases</a>. Install it and open <strong>ExitLag Bridge</strong>.</li>
+          <li>Choose your platform's package <a href="#downloads">above</a>, follow its setup guide, and open <strong>ExitLag Bridge</strong>.</li>
           <li>First run opens <a href="https://www.exitlag.com/download">ExitLag's official download page</a>. Download the Windows <code>.exe</code> yourself and select it in setup.</li>
           <li>Review and complete the vendor wizard. Keep <code>C:\ExitLag</code> and uncheck <strong>Launch ExitLag</strong> at the end. Then sign in directly in the official dashboard.</li>
           <li>Configure your game if needed, apply its routes in ExitLag, then establish a new game connection. The packaged bridge starts its routing helper through normal administrator authorization.</li>
@@ -75,7 +86,7 @@
         <div class="table-wrap"><table>
           <thead><tr><th scope="col">Game / platform</th><th scope="col">Result</th><th scope="col">Observed scope</th></tr></thead>
           <tbody>
-            <tr><td>WoW Classic Era · Linux</td><td class="status">Working</td><td>Maintainer-verified gameplay with the original Linux bridge.</td></tr>
+            <tr><td>WoW Classic Era · Arch Linux</td><td class="status">Working</td><td>Maintainer-verified gameplay on Arch with the original bridge.</td></tr>
             <tr><td>WoW Classic Era · Mac</td><td class="status">Working</td><td>Stable world gameplay with bidirectional relay traffic.</td></tr>
             <tr><td>WoW Forever · Mac</td><td class="status">Partial</td><td>Relayed character selection only. World entry was unavailable before release.</td></tr>
             <tr><td>Minecraft Java · Linux</td><td class="status">Unstable</td><td>Traffic relayed, but sessions disconnected.</td></tr>
@@ -93,7 +104,7 @@
       </section>
       <section id="faq" class="faq" aria-labelledby="faq-heading">
         <h2 id="faq-heading">ExitLag on Linux and Mac: common questions</h2>
-        <details open><summary>Does ExitLag work on Linux?</summary><p>WoW Classic Era gameplay has been verified with the original Linux bridge. The new packages provide a graphical setup and native routing backend, with installer checks on Ubuntu 22.04 and 24.04. Other games require their own compatibility evidence.</p></details>
+        <details open><summary>Does ExitLag work on Linux?</summary><p>WoW Classic Era gameplay has been verified on Arch Linux with the original bridge. Arch users can follow the linked portable setup guide. The new packages provide graphical setup and native routing, with installer checks on Ubuntu 22.04 and 24.04. Other games require their own compatibility evidence.</p></details>
         <details open><summary>Can I use ExitLag on an Apple Silicon Mac?</summary><p>Yes, within the current experimental scope: macOS 15+ on Apple Silicon, with WoW-specific IPv4 TCP routing. Classic Era world gameplay and Forever character selection were verified. Intel, UDP and IPv6 routing are not supported by this Mac release.</p></details>
         <details><summary>Is ExitLag Bridge free?</summary><p>The bridge's own code is free under GPL-3.0-only. The official ExitLag client and your own valid account with an active subscription or trial are still required. No accounts or service access bypass are supplied.</p></details>
         <details><summary>Do I have to run a routing script every time?</summary><p>No developer Terminal script is needed for the packaged app. Open ExitLag Bridge, apply the game's route in the official dashboard, and connect the game. The native helper starts through the installed app and normal administrator authorization.</p></details>

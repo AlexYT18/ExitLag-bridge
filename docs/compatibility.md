@@ -5,7 +5,7 @@ reports, automated tests and observed game connections distinct.
 
 | Game | Platform | Recorded result | Tested scope |
 |---|---|---|---|
-| World of Warcraft Classic Era | Linux | Working — maintainer verified | Real gameplay with the original Linux bridge. |
+| World of Warcraft Classic Era | **Arch Linux, x86_64** | Working — maintainer verified | Real gameplay on Arch Linux with the original bridge. |
 | World of Warcraft Classic Era | macOS / Apple Silicon | Working | Stable gameplay and bidirectional world-server traffic through ExitLag. |
 | World of Warcraft Forever | macOS / Apple Silicon | Partial | Relayed character-selection connection; world entry was unavailable before release. |
 | Minecraft Java Edition | Native Linux | Unstable | Traffic was relayed, but sessions disconnected; not considered working gameplay. |
@@ -13,6 +13,8 @@ reports, automated tests and observed game connections distinct.
 | Tibia | Native Linux | Detection only | In-world flows recognized; no redirect was supplied in the recorded test. |
 | Other games | Linux / macOS | Untested | Community reports and pull requests are welcome. |
 
+**Arch Linux is the maintainer's verified Linux gameplay platform.** The
+[Arch setup guide](arch-linux.md) uses the shared Linux portable installer.
 Automated packaging checks are separate from gameplay: Ubuntu 22.04 and 24.04
 cover clean Wine/WMI setup, installed first-run UI, ownership checks, UID-scoped
 routing startup, removed/expired leases, parent-exit cleanup and account-preserving

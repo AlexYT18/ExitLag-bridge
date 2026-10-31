@@ -7,7 +7,7 @@ World of Warcraft Classic Era gameplay has been verified on both platforms;
 other games have the specific results listed below.
 
 [Project website](https://cheaux.github.io/exitlag-bridge/) ·
-[Download installers](https://github.com/Cheaux/exitlag-bridge/releases) ·
+[Choose your download](https://cheaux.github.io/exitlag-bridge/#downloads) ·
 [Install and uninstall](installers/README.md) ·
 [Setup FAQ](docs/faq.md) ·
 [Games tested](#games-tested) ·
@@ -21,9 +21,10 @@ other games have the specific results listed below.
 
 | Platform | Download and start | Current scope |
 |---|---|---|
-| Ubuntu 22.04 / 24.04, x86_64 | Choose the matching `.deb` in [Releases](https://github.com/Cheaux/exitlag-bridge/releases), install it with the system package manager, then open **ExitLag Bridge**. | Graphical setup and game mappings; installer lifecycle checked on both Ubuntu versions. |
-| Other x86_64 Linux distributions | Portable `.tar.gz` plus the [documented dependencies](installers/README.md#linux). | Original Linux WoW gameplay verified; portable packages on other distributions remain unvalidated. |
-| Apple Silicon Mac, macOS 15+ | Install the `macos-arm64.pkg`, then open **ExitLag Bridge** in Applications. | Current routing is WoW-specific and IPv4 TCP only. Intel Macs are not supported by this binary. |
+| **Arch Linux, x86_64** | [Download Linux portable installer](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge-0.4.0-alpha.2-linux-x86_64.tar.gz) and follow the [Arch setup guide](docs/arch-linux.md). | **WoW Classic Era gameplay verified by the maintainer on Arch Linux** with the original bridge. |
+| Ubuntu 22.04 / 24.04, x86_64 | Download the matching [22.04 `.deb`](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge_0.4.0_ubuntu22.04_amd64.deb) or [24.04 `.deb`](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge_0.4.0_ubuntu24.04_amd64.deb), install it, then open **ExitLag Bridge**. | Graphical setup and game mappings; installer lifecycle checked on both Ubuntu versions. |
+| Other x86_64 Linux distributions | [Linux portable installer](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge-0.4.0-alpha.2-linux-x86_64.tar.gz) plus the [documented dependencies](installers/README.md#linux). | Additional distributions need their own compatibility reports. |
+| Apple Silicon Mac, macOS 15+ | [Download the Mac installer](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/ExitLag-Bridge-0.4.0-alpha.2-macos-arm64.pkg), install it, then open **ExitLag Bridge** in Applications. | Current routing is WoW-specific and IPv4 TCP only. Intel Macs are not supported by this binary. |
 
 First run opens ExitLag's official download page. Download its Windows `.exe`
 yourself, select it in the bridge, and complete the vendor wizard. Keep
@@ -70,7 +71,7 @@ the official dashboard directly and keeps optional status in the menu bar.
 
 | Game | Platform | Recorded result | Tested scope |
 |---|---|---|---|
-| World of Warcraft Classic Era | Linux | Working — maintainer verified | Real gameplay with the original Linux bridge. |
+| World of Warcraft Classic Era | **Arch Linux, x86_64** | Working — maintainer verified | Real gameplay on Arch Linux with the original bridge. |
 | World of Warcraft Classic Era | macOS / Apple Silicon | Working | Stable gameplay and bidirectional world-server traffic through ExitLag. |
 | World of Warcraft Forever | macOS / Apple Silicon | Partial | Relayed character-selection connection; world entry was unavailable before release. |
 | Minecraft Java Edition | Native Linux | Unstable | Traffic was relayed, but sessions disconnected; not considered working gameplay. |

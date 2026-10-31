@@ -1,4 +1,8 @@
-# Installer release preparation
+# Install ExitLag Bridge
+
+[Choose your platform's download](https://cheaux.github.io/exitlag-bridge/#downloads).
+Use the Mac installer, the `.deb` matching your Ubuntu version, or the shared
+Linux portable installer for Arch Linux and other x86_64 distributions.
 
 The bridge is GPL-3.0-only. ExitLag is downloaded separately from
 [its official download page](https://www.exitlag.com/download). We do not ship,
@@ -15,7 +19,7 @@ routing replaces the Windows driver. Other installer failures are not ignored.
 
 ## macOS
 
-Install **ExitLag Mac Setup.pkg**, then open **ExitLag Bridge** in Applications.
+Download and install the [Mac installer](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/ExitLag-Bridge-0.4.0-alpha.2-macos-arm64.pkg), then open **ExitLag Bridge** in Applications.
 First run shows setup; subsequent launches open the real ExitLag dashboard.
 The package includes an immutable standalone Python interpreter for the routing
 helper, so end users do not need Command Line Tools or Homebrew. Wine downloads
@@ -28,7 +32,7 @@ live-game evidence is Apple Silicon/macOS 27.2. Intel builds, reboot/sleep
 recovery, and Forever world entry still need validation. Forever has only been
 verified through character selection.
 
-**ExitLag Bridge Uninstall.pkg** removes the program and administrator helper,
+The [Mac uninstall package](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/ExitLag-Bridge-Uninstall-0.4.0-alpha.2-macos-arm64.pkg) removes the program and administrator helper,
 after quitting the bridge. It preserves the private Wine prefix and account data.
 The app has an ad-hoc signature. The `.pkg` installers are unsigned, and the
 build is not notarized. Do not disable system-wide security settings to install it.
@@ -46,15 +50,29 @@ are ignored by Git. The builder's own Python version may need the standard
 
 ## Linux
 
-The packaged beta supports **x86_64**. For Ubuntu/Debian, install the `.deb` with
-your graphical package manager or `sudo apt install ./exitlag-bridge_0.4.0_amd64.deb`.
+The packaged beta supports **x86_64**. **Arch Linux** is the maintainer's verified
+WoW gameplay platform; use the [Arch setup guide](../docs/arch-linux.md).
+
+For Ubuntu, download the matching [22.04 package](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge_0.4.0_ubuntu22.04_amd64.deb)
+or [24.04 package](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge_0.4.0_ubuntu24.04_amd64.deb),
+then install it with your graphical package manager. For example, on Ubuntu 22.04:
+
+```sh
+sudo apt install ./exitlag-bridge_0.4.0_ubuntu22.04_amd64.deb
+```
+
+Use the `ubuntu24.04` filename for Ubuntu 24.04.
 This installs desktop integration and declares system runtime dependencies.
 Open **ExitLag Bridge** from the applications menu as your normal user.
 
-A portable `.tar.gz` contains `install.sh`, `uninstall.sh` and the program tree.
+The [shared Linux portable archive](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge-0.4.0-alpha.2-linux-x86_64.tar.gz)
+contains `install.sh`, `uninstall.sh` and the program tree.
 Install the listed dependencies using your distribution's package manager, then
 run `sudo bash ./install.sh`. It installs under `/usr/local/lib/exitlag-bridge`.
-On distributions other than Ubuntu 22.04/24.04 the portable package is untested.
+Arch gameplay evidence comes from the original bridge. The new packaged
+installer's automated lifecycle checks run on Ubuntu 22.04/24.04; a fresh packaged
+install-to-gameplay cycle on Arch has not been repeated. The shared portable
+binary uses the Ubuntu 22.04 build as its compatibility baseline.
 `nftables`, NFQUEUE support, libmnl, Python 3.10+ with Tk, polkit with a desktop
 agent, curl, certificates and the normal Wine graphics/audio libraries are needed.
 A Wayland session needs XWayland for the current Wine client.

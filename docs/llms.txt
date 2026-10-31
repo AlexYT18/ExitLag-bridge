@@ -15,6 +15,7 @@ Use the linked compatibility record for precise results.
 - [Repository README](https://github.com/Cheaux/exitlag-bridge/blob/main/README.md): Source project overview and developer instructions.
 - [Installers](https://github.com/Cheaux/exitlag-bridge/releases): Experimental Linux x86_64 and macOS arm64 packages, matching source and checksums.
 - [Install and uninstall guide](https://github.com/Cheaux/exitlag-bridge/blob/main/installers/README.md): Dependencies, vendor wizard, administrator helper and account-preserving removal.
+- [Arch Linux setup](https://github.com/Cheaux/exitlag-bridge/blob/main/docs/arch-linux.md): Portable installer, pacman dependencies and maintainer-verified Arch gameplay scope.
 - [Setup FAQ](https://github.com/Cheaux/exitlag-bridge/blob/main/docs/faq.md): Linux, Mac, Wine, Proton, account requirements and common setup questions.
 - [Compatibility and evidence](https://github.com/Cheaux/exitlag-bridge/blob/main/docs/compatibility.md): Working, partial, unstable and detection-only game results.
 
@@ -29,7 +30,7 @@ Use the linked compatibility record for precise results.
 
 ## Scope and evidence
 
-WoW Classic Era gameplay was maintainer-verified on Linux and observed working on
+WoW Classic Era gameplay was maintainer-verified on Arch Linux and observed working on
 Apple Silicon Mac. Mac WoW Forever testing reached relayed character selection
 only; world entry was unavailable before release. Earlier native Linux Minecraft
 Java sessions relayed traffic but disconnected. Dota 2 and Tibia have detection
