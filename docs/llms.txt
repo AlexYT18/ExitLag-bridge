@@ -37,7 +37,9 @@ only; world entry was unavailable before release. Earlier native Linux Minecraft
 Java sessions relayed traffic but disconnected. Dota 2 and Tibia have detection
 evidence only. Other games are untested.
 
-Ubuntu 22.04/24.04 installer lifecycle checks are separate from gameplay tests.
+The same Linux archive passes installer lifecycle checks on Ubuntu 22.04/24.04
+and Arch userspace in an official disposable container on an Ubuntu CI host kernel.
+These automated checks are separate from gameplay tests.
 The Mac binary targets macOS 15+ on Apple Silicon, was live-tested on macOS 27.2,
 and supports recognized WoW installations over IPv4 TCP only. Intel, Mac UDP and
 Mac IPv6 routing are not implemented. Mac installers are unsigned and not notarized.

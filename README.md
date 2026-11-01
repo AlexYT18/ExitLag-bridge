@@ -1,6 +1,6 @@
 # ExitLag for Linux and macOS — ExitLag Bridge
 
-Run the official ExitLag Windows client on **Linux** and **Apple Silicon Mac**
+Run the official ExitLag Windows client on **Arch Linux**, **Ubuntu** and **Apple Silicon Mac**
 with this unofficial, open-source compatibility bridge. ExitLag Bridge provides
 graphical installers, a Wine compatibility layer and native game-traffic routing.
 World of Warcraft Classic Era gameplay has been verified on both platforms;
@@ -115,6 +115,10 @@ The interface provenance review remains open; see
 [THIRD_PARTY.md](THIRD_PARTY.md) and
 [the review record](docs/provenance-review.md). No statement here represents
 vendor endorsement or legal approval.
+
+## Build the Linux bridge from source
+
+The following requirements and commands are for developers. For packaged installation, use the [shared Linux guide](docs/linux.md) or [Mac installer guide](installers/README.md#macos).
 
 ## Requirements
 

@@ -33,6 +33,8 @@
     "programmingLanguage": ["C", "C++", "Python", "Swift"],
     "runtimePlatform": "Linux x86_64 or Apple Silicon macOS 15+, with Wine",
     "inLanguage": "en",
+    "version": "0.4.0-alpha.2",
+    "author": {"@type": "Person", "name": "Cheaux", "url": "https://github.com/Cheaux"},
     "isAccessibleForFree": true
   }
   </script>
@@ -102,8 +104,10 @@
       </section>
       <section id="faq" class="faq" aria-labelledby="faq-heading">
         <h2 id="faq-heading">ExitLag on Linux and Mac: common questions</h2>
-        <details open><summary>Does ExitLag work on Linux?</summary><p>WoW Classic Era gameplay has been verified on Arch Linux with the original bridge. Arch users can follow the linked portable setup guide. The new packages provide graphical setup and native routing, with installer checks on Ubuntu 22.04 and 24.04. Other games require their own compatibility evidence.</p></details>
+        <details open><summary>Does ExitLag work on Linux?</summary><p>WoW Classic Era gameplay has been verified on Arch Linux with the original bridge. Arch users can follow the linked portable setup guide. The shared Linux archive passes install, fresh-runtime, routing-helper and removal checks on Ubuntu 22.04/24.04 and Arch userspace in a disposable container. The container uses the Ubuntu CI host kernel; these checks are separate from gameplay verification. Other games require their own compatibility evidence.</p></details>
         <details open><summary>Can I use ExitLag on an Apple Silicon Mac?</summary><p>Yes, within the current experimental scope: macOS 15+ on Apple Silicon, with WoW-specific IPv4 TCP routing. Classic Era world gameplay and Forever character selection were verified. Intel, UDP and IPv6 routing are not supported by this Mac release.</p></details>
+        <details><summary>Do Arch and Ubuntu use the same Linux installer?</summary><p>Yes. Download the same x86_64 archive for Arch Linux or Ubuntu 22.04/24.04, install the dependencies with pacman or apt, and follow the <a href="https://github.com/Cheaux/exitlag-bridge/blob/main/docs/linux.md">shared Linux setup guide</a>. The optional Ubuntu .deb is an alternative installation method; choose one method at a time.</p></details>
+        <details><summary>Where do I choose the ExitLag Windows .exe?</summary><p>Open ExitLag Bridge after installation. Click <strong>Download from ExitLag</strong> to open the official website, then <strong>Choose installer…</strong> to select the downloaded Windows executable. The bridge does not bundle or automatically download the proprietary client.</p></details>
         <details><summary>Is ExitLag Bridge free?</summary><p>The bridge's own code is free under GPL-3.0-only. The official ExitLag client and your own valid account with an active subscription or trial are still required. No accounts or service access bypass are supplied.</p></details>
         <details><summary>Do I have to run a routing script every time?</summary><p>No developer Terminal script is needed for the packaged app. Open ExitLag Bridge, apply the game's route in the official dashboard, and connect the game. The native helper starts through the installed app and normal administrator authorization.</p></details>
         <details><summary>Can it route Proton or other Wine prefixes?</summary><p>The Linux bridge supports exact native-executable and Wine/Proton-prefix mappings. Use Configure games and the Windows identity expected by ExitLag. A prefix mapping applies to the whole prefix. This capability is not a guarantee that every game's transport will work.</p></details>
@@ -113,7 +117,7 @@
       </section>
     </main>
     <footer>
-      <p><strong>ExitLag Bridge</strong> · Unofficial open-source project · <a href="https://github.com/Cheaux/exitlag-bridge/blob/main/LICENSE">GPL-3.0-only</a></p>
+      <p><strong>ExitLag Bridge</strong> · Unofficial open-source project by <a href="https://github.com/Cheaux">Cheaux</a> · <a href="https://github.com/Cheaux/exitlag-bridge/blob/main/LICENSE">GPL-3.0-only</a></p>
       <p>Third-party components retain their own licenses. <a href="https://github.com/Cheaux/exitlag-bridge/blob/main/THIRD_PARTY.md">Third-party and interface provenance</a> · <a href="https://github.com/Cheaux/exitlag-bridge/issues">Issues</a></p>
       <p>This is an experimental release. Sleep/reboot recovery, additional machines and future client versions need further validation. No analytics, tracking scripts or sign-in are used on this documentation page.</p>
     </footer>
