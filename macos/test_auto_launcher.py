@@ -1,5 +1,6 @@
 """Automatic launcher boundaries and actual loopback companion reloading."""
 import contextlib
+import fcntl
 import os
 from pathlib import Path
 import secrets
@@ -10,6 +11,7 @@ import time
 import unittest
 from unittest import mock
 import auto_common as c
+import auto_agent as agent
 import auto_service as service
 import test_bridge
 from test_wine_socket import AdapterServer
@@ -17,6 +19,19 @@ from wine_socket import ReloadingWineSocketAdapter
 from bridge import load_identities
 
 class Records(unittest.TestCase):
+    def test_launcher_read_lock_does_not_stop_status_publication(self):
+        with tempfile.TemporaryDirectory() as folder, mock.patch.object(agent, 'STATE', Path(folder)):
+            path = Path(folder) / 'launcher-status.json'
+            previous = {'stage': 'ready', 'updated_at': 1}
+            updated = {'stage': 'ready', 'updated_at': 2}
+            c.publish(path, os.getuid(), previous)
+            with path.open('rb') as reader:
+                fcntl.flock(reader.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+                agent.publish_status(updated)
+                self.assertEqual(c.read_private(path, os.getuid())[0], previous)
+            agent.publish_status(updated)
+            self.assertEqual(c.read_private(path, os.getuid())[0], updated)
+
     def test_private_control_is_bounded_and_epoch_scoped(self):
         epoch = secrets.token_hex(16)
         value = dict(version=1, epoch=epoch, run=True)

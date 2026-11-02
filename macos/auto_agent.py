@@ -21,6 +21,15 @@ HERE = Path(__file__).resolve().parent
 STOPPING = False
 
 
+def publish_status(value):
+    # The launcher briefly holds a shared lock while reading. A missed status
+    # update must not stop the client and companions; the next loop retries it.
+    try:
+        publish(STATE / 'launcher-status.json', os.getuid(), value)
+    except BlockingIOError:
+        pass
+
+
 class Lease:
     def __init__(self, parent):
         self.parent = parent
@@ -182,7 +191,7 @@ def main():
                 pids = client_pids(executable)
                 if not pids and time.monotonic() - launched_at > 20:
                     stage, message = 'closed', 'ExitLag is closed. Ordinary routing is active.'
-                    publish(STATE / 'launcher-status.json', os.getuid(), dict(stage=stage, message=message, updated_at=time.time()))
+                    publish_status(dict(stage=stage, message=message, updated_at=time.time()))
                     break
                 found = native_pids(resolver)
                 for native in identities:
@@ -214,7 +223,7 @@ def main():
                 'Forever' if '/_forever_/' in native else 'Classic Era' for native in companions],
                 routing=bool(service and service.get('routing')), relay_active=(service or {}).get('relay_active', 0),
                 bytes_received=(service or {}).get('bytes_received', 0))
-            publish(STATE / 'launcher-status.json', os.getuid(), value)
+            publish_status(value)
             time.sleep(.5)
     finally:
         lease.close()
