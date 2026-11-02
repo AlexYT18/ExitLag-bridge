@@ -1,0 +1,16 @@
+test_duplicate_canonical_mapping_is_rejected_but_distinct_loaders_work (__main__.Supervisor.test_duplicate_canonical_mapping_is_rejected_but_distinct_loaders_work) ... ok
+test_expired_or_removed_lease_stops_routing (__main__.Supervisor.test_expired_or_removed_lease_stops_routing) ... ok
+test_lease_requires_private_regular_single_link_file (__main__.Supervisor.test_lease_requires_private_regular_single_link_file) ... ok
+test_lease_timestamp_boundaries_reject_future_and_expired_records (__main__.Supervisor.test_lease_timestamp_boundaries_reject_future_and_expired_records) ... ok
+test_map_is_data_not_a_root_command (__main__.Supervisor.test_map_is_data_not_a_root_command) ... ok
+test_map_links_public_files_and_other_owners_are_refused (__main__.Supervisor.test_map_links_public_files_and_other_owners_are_refused) ... ok
+test_native_mapping_does_not_accept_extra_owner_column (__main__.Supervisor.test_native_mapping_does_not_accept_extra_owner_column) ... ok
+test_parent_identity_includes_owner_and_start_time (__main__.Supervisor.test_parent_identity_includes_owner_and_start_time) ... ok
+test_prefix_mapping_requires_actual_loader_third_column (__main__.Supervisor.test_prefix_mapping_requires_actual_loader_third_column) ... ok
+test_prefix_owner_and_native_source_must_be_regular_executables (__main__.Supervisor.test_prefix_owner_and_native_source_must_be_regular_executables) ... ok
+test_uninstalled_privileged_entry_refuses_to_run (__main__.Supervisor.test_uninstalled_privileged_entry_refuses_to_run) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.012s
+
+OK

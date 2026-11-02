@@ -1,0 +1,5 @@
+make: Entering directory '/tmp/exitlag-source/backend'
+cc  -O1 -g -Wall -Wextra -fno-omit-frame-pointer -fsanitize=address,undefined -fsanitize=address,undefined -o ipc-transport-test ../tests/ipc-transport-test.c ipc_transport.c
+./ipc-transport-test
+PASS: IPC framing, fragmentation, absolute deadlines, backpressure, EINTR and disconnects
+make: Leaving directory '/tmp/exitlag-source/backend'

@@ -1,0 +1,15 @@
+make: Entering directory '/tmp/exitlag-source/backend'
+cc  -O1 -g -Wall -Wextra -fno-omit-frame-pointer -fsanitize=address,undefined -fsanitize=address,undefined -o exitlag-netd exitlag-netd.c ipc_transport.c -lmnl
+exitlag-netd.c: In function ‘log_line’:
+exitlag-netd.c:324:5: warning: null format string [-Wformat-overflow=]
+  324 |     vfprintf(out, fmt, ap);
+      |     ^~~~~~~~~~~~~~~~~~~~~~
+exitlag-netd.c:324:5: warning: null format string [-Wformat-overflow=]
+exitlag-netd.c: In function ‘load_identity_map’:
+exitlag-netd.c:842:57: warning: ‘%s’ directive output may be truncated writing up to 4107 bytes into a region of size 4096 [-Wformat-truncation=]
+  842 |         snprintf(entry->source, sizeof(entry->source), "%s", source);
+      |                                                         ^~
+exitlag-netd.c:842:9: note: ‘snprintf’ output between 1 and 4108 bytes into a destination of size 4096
+  842 |         snprintf(entry->source, sizeof(entry->source), "%s", source);
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+make: Leaving directory '/tmp/exitlag-source/backend'

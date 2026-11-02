@@ -1,7 +1,10 @@
 # Architecture
 
-This describes the design as it is actually proven to work. It is a freeze of
-the current implementation, not a plan.
+This describes the Linux implementation and separates its mechanisms from
+historical live observations. It does not establish compatibility with every
+game or client build. See the [initial audit](audit/INITIAL_AUDIT.md),
+[compatibility record](compatibility.md) and [roadmap](audit/ROADMAP.md) for
+evidence boundaries and work still to validate.
 
 The project replaces exactly one thing: the Windows packet-interception backend
 that ExitLag's client talks to. Everything else — login, subscription, relay
@@ -29,9 +32,10 @@ unmodified under Wine.
        TCP destination rewrite / UDP take-and-reinject
 ```
 
-The loopback socket is not a stylistic choice: Wine's `ws2_32` has no `AF_UNIX`
-support (`dlls/ws2_32/unixlib.c`), so a Windows-side DLL cannot use a unix
-socket to reach a native helper.
+The transport uses loopback TCP because the Wine 11.17 `ws2_32` family map
+used during development lacked `AF_UNIX`. Loopback alone is not authentication:
+the helper also checks the peer uid and a per-session token. See the
+[security review](security-review.md) and [RPC surface](rpc-surface.md).
 
 ## Control plane vs data plane
 
@@ -58,9 +62,10 @@ nf_setRulesEx.rule protocol=6(TCP) processId=0 direction=2(OUT)
   filteringFlag=0x10(INDICATE_CONNECT_REQUESTS) processName=""
 ```
 
-`processId=0` and `processName=""` mean every process is filtered and the real
-decision is deferred to a per-connection callback. That single fact is what
-makes external-process routing possible at all.
+`processId=0` and `processName=""` make this vendor rule broad; the routing
+decision is deferred to a per-connection callback. Native queue scope and exact
+identity mappings provide additional boundaries. Packaged user-scoped routing
+must not be confused with the broader developer runners.
 
 A redirected connection goes like this:
 
@@ -73,10 +78,10 @@ A redirected connection goes like this:
    `filteringFlag` to `0x210` (redirect).
 4. On a complete address+port mutation, the helper installs one exact element
    into the family's map — `tcp_redirect_v4` or `tcp_redirect_v6` — keyed by the
-   full 4-tuple, with a 10-second timeout. The target is validated per family
-   before anything is armed (not unspecified, not multicast, not loopback), and
-   a mutation the validator rejects arms nothing rather than arming something
-   approximate.
+   full 4-tuple, with a 10-second timeout. The family must match, the port must
+   be nonzero, and unspecified, broadcast (IPv4) and multicast addresses are
+   rejected. By default the target must be loopback: `127/8`, `::1`, or
+   IPv4-mapped `::ffff:127/8`. A rejected mutation arms no redirect.
 5. The SYN is ACCEPTed and continues to `output_nat` (nat hook, dstnat
    priority), where the map performs the DNAT. Conntrack carries the translation
    for the rest of the connection, so the steady-state data path is untouched.
@@ -84,22 +89,26 @@ A redirected connection goes like this:
 The queue sits after conntrack but before NAT specifically so the map element
 can be installed while the SYN is still suspended.
 
-Observed end to end: a process believing it is connected to `66.40.178.239:3724`
-has its traffic terminated inside `ExitLag.exe` on `127.0.0.1`.
+Historical WoW observations reported a connection whose application-visible
+game-server endpoint was translated to an ExitLag listener on `127.0.0.1`.
+That observation is not a new live result for the current checkout.
 
 ## UDP flow
 
-UDP has no connection to pin a DNAT map to, so it uses take-and-reinject.
+This backend's active UDP path uses take-and-reinject rather than the TCP DNAT
+map. It supports a narrow IPv4 callback contract; it is not general UDP support.
 
 Two chains (`output_udp_observe`, `input_udp_observe`, filter priority -10)
 queue datagrams in both directions. The helper tracks endpoints keyed by a
 synthetic 64-bit id and reports lifecycle events (`udpCreated`,
 `udpConnectRequest`) plus each datagram to ExitLag.
 
-For a datagram ExitLag has posted a replacement for, the helper drops the
-original and re-sends ExitLag's version from a raw socket carrying mark
-`0x584c0001`. A dedicated rule accepts that mark so the reinjected copy does not
-re-enter the queue. Replies are delivered back to the original socket.
+For a supported outgoing callback, the posted remote address and payload must
+match the original datagram and the recorded remote rule must match. After a
+successful raw send carrying mark `0x584c0001`, the helper drops the original.
+A dedicated rule accepts that mark so the reinjected copy does not re-enter
+the queue. The supported receive path accepts the original incoming datagram;
+unsupported callback shapes leave it unchanged.
 
 Endpoint state is bounded and self-expiring: at most 2048 endpoints, 16 unique
 remote-address rules each. An endpoint is released when its socket inode
@@ -114,10 +123,10 @@ of the system:
 
 - **Native Linux process** — the PID is the process itself. `/proc/<pid>/exe` is
   its real executable.
-- **Wine or Proton** — at SYN time the socket is held **only by that prefix's
-  `wineserver`**. The game process acquires the fd later, too late to attribute.
-  Every `wineserver` has an identical `/proc/<pid>/exe` and argv, so neither can
-  identify which game it is serving.
+- **Wine or Proton** — during the recorded SYN-time experiments, the socket
+  could be held only by the prefix's `wineserver`, before the game acquired its
+  fd. A shared wineserver executable does not identify a particular game;
+  separate prefix mappings address that case.
 - **Inside ExitLag's own prefix** — ExitLag resolves its own Wine PIDs through
   `GetExtendedTcpTable(TCP_TABLE_OWNER_PID_ALL)`, which works only within its
   own prefix.
@@ -129,25 +138,25 @@ reply).
 
 ### Identity mapping
 
-`exitlag-netd --identity-map FILE` loads exact `SOURCE<TAB>WINDOWS_PATH` pairs.
-Three source forms, each matching a different attribution case:
+`exitlag-netd --identity-map FILE` loads exact native `SOURCE<TAB>WINDOWS_PATH`
+pairs and executable-bound prefix `SOURCE<TAB>WINDOWS_PATH<TAB>OWNER_EXE` rows.
+Two source forms are accepted:
 
 | Source form | Matched against | Use |
 |---|---|---|
 | absolute host path | canonical `/proc/<pid>/exe` | native Linux game |
-| exact `.exe` argv token | one whole argv entry | a process that owns its own socket |
-| `wineprefix:<dir>` | `WINEPREFIX` from `/proc/<pid>/environ` | **required** for Wine and Proton |
+| `wineprefix:<dir>` plus mandatory owner column | canonical absolute `WINEPREFIX` and exact kernel-reported owner executable | explicit Wine/Proton prefix scope; not Windows image proof |
 
-Loading a map enables **strict mode**, which disables the fallback argv scan.
-Without that, any process could impersonate a configured game by putting the
-path in its own command line. In strict mode an unmapped process keeps its
-genuine executable and therefore fails open, unrouted.
+An arbitrary `.exe` argv token is not an accepted mapping source. Loading a map
+enables strict mode: unmapped processes retain their genuine identity rather
+than acquiring a configured game's Windows identity. See
+[process identity translation](process-identity-translation.md) for the current
+mapping and attribution rules. A matching identity still does not prove that
+ExitLag returned a redirect or that gameplay works.
 
 Both sides of a comparison pass through `realpath()`, which matters in practice:
 Proton sets `WINEPREFIX` with a trailing slash while a user writes the entry
 without one.
-
-See `docs/process-identity-translation.md`.
 
 ## Runtime ownership
 
@@ -175,26 +184,34 @@ reconnect loop.
 
 ## Fail-open semantics
 
-Every failure path accepts the packet unchanged. There is no configuration in
-which losing this software breaks networking:
+The intended fallback for an unresolved routing decision is to accept the
+queued packet unchanged. Attribution misses, absent usable shim replies,
+invalid TCP targets, failed map updates and unsupported UDP contracts use that
+fallback. The default callback timeout is 300 ms; framing and deadline behavior
+must be assessed with the transport tests for the exact source revision.
 
-- `queue ... bypass` — if the helper is not running, the kernel accepts rather
-  than dropping. This is a kernel-level guarantee, not application logic.
-- no shim connected, shim reply slower than 300ms, malformed reply, unchanged
-  callback result, partial or non-IPv4 mutation, unsupported UDP contract shape,
-  raw-send failure, attribution miss → ACCEPT unchanged.
-- protocol version mismatch → disconnect and fail open.
+`queue ... bypass` lets packets pass when no queue listener is bound. It does
+not by itself cover a full queue or a listener that is alive but stalled.
+Already established DNAT connections retain conntrack state; losing their
+ExitLag proxy does not migrate them to a direct connection. Helper failure,
+proxy failure and survival of an existing relay session are different checks.
+See [runtime hardening](runtime-hardening.md) for the recorded test scope.
 
-## Cleanup guarantees
+## Cleanup and recovery
 
-All state lives in one dedicated `inet exitlag` table, so teardown is a single
-atomic delete. Runners install it only after the helper is live and remove it
-from an EXIT trap that also covers Ctrl-C and crashes. `runtime_guard_wait`
-returns as soon as the helper dies rather than waiting out a timer, so the table
-does not linger in fail-open mode.
+The project's nftables rules and maps live in the dedicated `inet exitlag`
+table, so deleting that table removes that firewall surface in one operation.
+It does not erase existing conntrack translations. Runners install the table
+after helper startup and use EXIT/INT/TERM traps for ordinary cleanup.
+`runtime_guard_wait` waits for the helper or a timer and returns when the
+helper exits so the runner can clean up.
 
-Verified: no table and no helper process remain after normal exit, Ctrl-C,
-SIGKILL of the runner, or helper crash.
+SIGKILL cannot execute a trap. A killed runner can leave an orphan helper and
+table; `runtime_guard_acquire` attempts recovery on the next authorized start
+using its recorded ownership state. A table without verifiable project
+ownership causes refusal instead of automatic deletion. The historical
+hardening scenarios test these cases separately; they are not a guarantee of
+cleanup after every machine or process failure.
 
 ## Wine-specific compatibility
 
@@ -204,14 +221,20 @@ SIGKILL of the runner, or helper crash.
   process — this is what crashed the client on the PC Boost and DNS pages. The
   shim patches the main image's IAT at process attach so those return
   `ERROR_NOT_SUPPORTED` instead. See `docs/wine-stub-crash-guards.md`.
-- **WMI.** ExitLag queries `Win32_LogicalDiskRootDirectory`, which Wine's
-  `wbemprox` does not implement; a prefix-local patched `wbemprox` supplies it.
+- **WMI.** ExitLag queries `Win32_LogicalDiskRootDirectory`, which the tested
+  Wine build lacked. Packaged setup prepares a patched WMI payload; developer
+  setup can use the project-local Wine build. Neither requires modifying system
+  Wine. See [Wine setup](wine-setup.md) and the [installer guide](../installers/README.md).
 - **Rendering.** The Qt UI needs `QSG_RHI_BACKEND=opengl` under this Wine build.
 - **`nfextlag`.** A compatibility surface for the driver-name ExitLag expects.
 
 ## Status of each behaviour
 
-**Proven with live ExitLag and real traffic**
+**Historical development observations**
+
+The following were reported during development. Private traces and original
+machine state are not included in this source snapshot, and this list is not a
+rerun against the current packaged installer:
 
 - TCP destination rewrite, including real WoW world connections
 - UDP take-and-reinject (20/20 payload hashes matched, 0 ENOBUFS)
@@ -221,8 +244,9 @@ SIGKILL of the runner, or helper crash.
   UI showed the native Dota 2 session, matching endpoint, without a restart
 - separate Wine prefix routing, with an unmapped control not routed
 - Proton routing including pressure-vessel containment
-- helper crash, runner SIGKILL, reconnect, version mismatch, stale-table refusal,
-  unreachable destination — all fail open and recover
+- helper crash, runner SIGKILL recovery, reconnect, version mismatch,
+  stale-table refusal and an unreachable destination in the scoped hardening
+  harness; see [runtime hardening](runtime-hardening.md)
 
 **Optional / debug only**
 
@@ -239,12 +263,14 @@ SIGKILL of the runner, or helper crash.
 
 - `wineprefix:` maps an entire prefix to one game identity. Correct for Proton
   (one prefix per title); too coarse for a hand-made prefix holding several games.
-- Strict mode applies to in-prefix games too. A game inside ExitLag's own prefix
-  that is not in the map resolves to the ELF loader and stops being routed.
+- Strict mode applies to in-prefix games too. An unmapped game must not be
+  assumed to receive the configured Windows identity.
 - TCP rewriting handles both families. Active **UDP** rewriting is IPv4 only.
 - The IPv6 TCP path is proven against a synthetic peer, not a live title: no
   game observed here has yet been given an IPv6 route by ExitLag, so the
   decision stage has never exercised it. See `docs/ipv6-active-rewrite.md`.
 - Redirection method must stay Automatic/WFP. NDIS needs `\\.\NDEXTLAG`.
 - Route analysis protocol should be TCP; ICMP works but is widely rate-limited.
-- Not tested: physical link down/up, and long-duration soak beyond ~25 minutes.
+- No completed physical link down/up test or long-duration soak beyond the
+  historical ~25-minute session is recorded here. These remain validation items,
+  not working-feature claims.

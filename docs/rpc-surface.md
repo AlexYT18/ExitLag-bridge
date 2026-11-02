@@ -1,95 +1,106 @@
 # The helper's privileged RPC surface
 
-`exitlag-netd` runs as root. Authentication (`docs/security-review.md`) decides
-*who* may talk to it; this document is about *what they can then ask for*. The
-goal is that holding the session token is not a licence to make a root process
-do arbitrary networking — the helper must be able to do only what the proven
-ExitLag runtime needs.
+The Linux helper runs with the privileges needed for NFQUEUE and nftables.
+[Authentication](security-review.md) controls the peer uid and session token;
+this document describes the operations reachable after authentication. Inputs
+from an authenticated peer remain untrusted. See the
+[initial audit](audit/INITIAL_AUDIT.md) and [roadmap](audit/ROADMAP.md) for the
+review findings and outstanding validation.
 
-## Messages the helper accepts
+## Wire messages
 
-| Message | Privileged action it can trigger | Trusted input | Bounds and limits |
+`backend/protocol.h` is the source of truth for message values and layouts.
+The principal peer-to-helper messages are:
+
+| Message | Value | Peer-controlled data | Operation |
 |---|---|---|---|
-| `HELLO` (0x0001) | none — establishes the session | none; token verified in constant time before anything else | exact length required; version must match; trailing bytes drained |
-| `PONG` (0x0004) | none — liveness only | none | length must be 0 |
-| `TCP_CONNECT_REPLY` (0x0011) | **installs an nftables DNAT element** | the rewritten destination address and port | see below |
-| `RESOLVE_PID_REQ` (0x0020) | reads `/proc/<pid>` | a PID | see below |
-| `UDP_POST` (0x0042) | **sends a UDP datagram from a raw socket** | payload bytes, remote address | see below |
-| `UDP_STATE` (0x0043) | records per-endpoint state | endpoint id, flags, address | bounded tables; see below |
+| `HELLO` | `0x0001` | version, claimed Windows PID, session token | establish an authenticated session |
+| `PONG` | `0x0004` | empty payload | heartbeat response |
+| `TCP_CONNECT_REPLY` | `0x0011` | tag, flags, destination sockaddr | request a per-flow DNAT element |
+| `RESOLVE_PID_REQ` | `0x0020` | tag, Linux PID | request process identity resolution |
+| UDP lifecycle/connect/datagram replies | `0x0041`, `0x0043`, `0x0045`, `0x0049` | tag and callback results | finish an outstanding callback |
+| `UDP_POST` | `0x0046` | event tag, endpoint, remote address, payload | participate in the supported UDP reinjection contract |
+| `UDP_STATE` | `0x0047` | event tag, endpoint, flags and remote-rule data | record bounded endpoint state |
 
-Anything else is ignored. Every frame is checked for magic, and a declared
-length above `EXL_MAX_PAYLOAD` (128 KiB) drops the connection rather than
-allocating. Payload reads are bounded by a 300 ms timeout, after which the
-packet is accepted unchanged. No message is ever interpreted as a path to
-execute or a command; replies are consumed as addresses, ports and bytes.
+Frames have a 12-byte EXL1 header and a maximum payload of 128 KiB. A reply's
+tag must match the outstanding request before its result is used. Message
+handling depends on connection state and the outstanding callback; these
+messages are not an arbitrary-command API. No wire field is evaluated as a
+shell command or executable path.
+
+The current helper transport uses absolute monotonic deadlines for complete
+frame reads/writes and callback exchanges, including nested messages. The
+default callback budget is 300 ms and the handshake budget is 2 seconds. This
+describes IPC waits, not all process attribution, nft execution or kernel queue
+work. Malformed framing, unknown messages, handshake state and stale replies
+still need negative tests for the exact source revision. The
+[initial audit](audit/INITIAL_AUDIT.md) records the original implementation's
+transport limits; use the current transport tests when assessing changes.
 
 ## TCP destination rewrite
 
-The most powerful operation, and the one most worth narrowing. A reply is only
-applied when **all** of these hold:
+A redirect requires active TCP routing, a changed destination and a mutation
+verdict for the observed flow. Validation is family-specific:
 
-- the original flow is IPv4 and the reply declares `EXL_VERDICT_MUTATED`
-- the returned family is `AF_INET`, the port is non-zero
-- the address is not `INADDR_ANY`, not broadcast, not multicast
-- the endpoint actually differs from the original (a padding-only change is not
-  a redirect)
-- **the target is a loopback address (`127/8`)**
+| Check | IPv4 | IPv6 |
+|---|---|---|
+| Wire family matches original flow | `2` (`AF_INET`) | `23` (Windows `AF_INET6`) |
+| Nonzero destination port | required | required |
+| Invalid destinations | unspecified, broadcast, multicast | unspecified, multicast |
+| Default allowed target | loopback `127/8` | `::1` or IPv4-mapped `::ffff:127/8` |
+| Padding-only change | no redirect | no redirect |
 
-That last condition is new. Every redirect ExitLag has ever produced in testing
-targeted `127.0.0.1` — its own local proxy. Permitting an arbitrary unicast
-destination would have let an authenticated peer steer this machine's outbound
-connections to an off-box address, which is far more power than the runtime
-needs. `--allow-remote-redirect` re-opens it for deliberate experiments and is
-never passed by the production runners.
+The map key is the original source/destination address and port, not a broad
+subnet or arbitrary nftables expression. A map element expires after 10 seconds;
+conntrack can retain an established translation afterward. No wire message
+supplies a rule, chain or command to execute.
 
-The element installed is a single exact 4-tuple with a 10-second timeout, in the
-project's own table. No general nftables state can be created: there is no
-message that carries a rule, a chain, or an expression.
+`--allow-remote-redirect` deliberately relaxes the loopback restriction for
+experiments. The production runners do not pass it. Historical real-client
+redirects targeted the local ExitLag proxy. The IPv6 application mechanism has
+a synthetic test; no live game receiving a vendor IPv6 redirect is recorded.
+See [IPv6 active rewrite](ipv6-active-rewrite.md).
 
-## PID resolution
+## PID resolution and identity
 
-`RESOLVE_PID_REQ` reads `/proc/<pid>/exe` and `/proc/<pid>/cmdline`. Unscoped,
-this is a "what is process N" oracle for every process on the machine, usable
-to enumerate paths a user might otherwise not see.
+By default, resolution requests are limited to PIDs previously reported by the
+helper. Out-of-scope requests return an empty path. The observed-PID set and
+process lifetime must be considered when assessing PID reuse; prior observation
+is not proof that a numeric PID still identifies the same process.
 
-It is now answered **only for PIDs the helper itself reported** to the shim.
-Those are exactly the PIDs the runtime needs resolved, since the shim only ever
-asks about a PID it was just handed. Anything else returns an empty path and is
-logged as refused. `--allow-any-pid-resolve` exists for IPC-only test harnesses
-that have no real traffic, and is never passed by the production runners.
-
-No filesystem path is ever *accepted* from the peer — only a PID. The identity
-map is read from a file named on the helper's own command line, not over IPC.
+`--allow-any-pid-resolve` broadens that scope for IPC-only harnesses and is not
+passed by the production runners. The identity map is read from a helper
+command-line file, not received over the wire. Exact mappings and Wine-prefix
+attribution are described in [process identity translation](process-identity-translation.md).
 
 ## UDP reinjection
 
-`UDP_POST` carries a payload the helper may re-send from a raw socket. The
-destination is not free: the take-and-reinject path requires the posted remote
-address to be **byte-identical to the original destination**, so this cannot be
-used to send traffic somewhere new. Payload length is bounded by
-`UDP_POST_PAYLOAD_MAX` (65507, one UDP datagram) and by the frame limit.
+Active UDP steering is IPv4-only and accepts a narrow callback contract. The
+posted remote address must match the original destination byte-for-byte, the
+posted payload must match the original datagram, and the expected endpoint and
+remote-rule state must be present. The outgoing original is dropped only after
+a successful supported reinjection; the supported incoming path accepts the
+original packet. Unsupported shapes fall back to accepting it unchanged.
 
-Per-endpoint state is fixed-size: at most 2048 endpoints and 16 unique remote
-rules each, so a peer cannot drive unbounded allocation. Endpoints expire on
-socket close or 60 s idle.
+Payload length is bounded by the frame limit and the 65507-byte UDP payload
+limit. Endpoint state is bounded to 2048 endpoints and 16 unique remote rules
+per endpoint, with idle/socket-lifetime retirement. Bounded allocation does not
+prove immunity to CPU, queue or socket pressure.
 
-## What a hostile authenticated peer still gets
+## Residual authority
 
-Being able to redirect a connection to a chosen **loopback port** is real power:
-it can capture traffic the user's own machine sends, if it can also listen on
-that port. It cannot send that traffic off-box through this interface, cannot
-create arbitrary firewall state, cannot read arbitrary files, and cannot
-enumerate unrelated processes.
+An authenticated peer can influence which local listener receives eligible
+outbound traffic. A process able to read the owning user's token can impersonate
+the shim. Restricting the DNAT destination to loopback prevents a direct
+non-loopback target in this API; it does not prevent a local proxy from forwarding
+traffic elsewhere. Same-user token access and local proxy authority remain
+part of the trust boundary.
 
-That residual is inherent to what the runtime does — ExitLag's whole purpose is
-to redirect connections to a local proxy — and is bounded by the fact that only
-a process able to read the owning user's token file can reach it at all.
+## Checks and their limits
 
-## Tests
-
-`tests/rpc-surface-test.sh` runs as an *authenticated* peer, because
-authentication is not authorisation. It checks that an unreported PID is
-refused rather than resolved, that the loopback-only redirect policy and its
-override are present, and that malformed privileged requests (short resolve
-request, absurd UDP length, truncated TCP reply, PID `0xFFFFFFFF`) do not kill
-the helper. 4/4.
+`tests/rpc-surface-test.sh` combines policy/source checks with malformed-request
+and PID-resolution cases over authenticated IPC. Its source assertions alone do
+not demonstrate real packet redirection. `tests/ipv6-redirect-test.sh` exercises
+the IPv6 application path with netfilter and a synthetic peer. IPC negative and
+framing suites exercise their respective transport cases. Use each suite's
+actual output and requirements; historical counts are not a current result.

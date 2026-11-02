@@ -1,0 +1,3 @@
+synthetic callback: ('192.0.2.2', 3724) -> 127.0.0.1:37307
+heartbeat, TCP payload in both directions and original application peer: PASS
+synthetic IPv4 TCP integration: PASS; owned table/helper/token cleaned up

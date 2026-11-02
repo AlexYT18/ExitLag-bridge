@@ -1,0 +1,18 @@
+test_plaintext_http_is_refused (__main__.Archives.test_plaintext_http_is_refused) ... ok
+test_traversal_links_and_devices_are_refused (__main__.Archives.test_traversal_links_and_devices_are_refused) ... ok
+test_wrong_download_bytes_are_not_used (__main__.Archives.test_wrong_download_bytes_are_not_used) ... ok
+test_bad_installer_fails_before_network_and_wine (__main__.Lifecycle.test_bad_installer_fails_before_network_and_wine) ... ok
+test_fresh_install_repair_and_vendor_handoff (__main__.Lifecycle.test_fresh_install_repair_and_vendor_handoff) ... ok
+test_missing_client_cannot_report_complete (__main__.Lifecycle.test_missing_client_cannot_report_complete) ... ok
+test_modified_payload_is_refused (__main__.Lifecycle.test_modified_payload_is_refused) ... ok
+test_redirected_windows_console_encoding_is_normalized (__main__.Lifecycle.test_redirected_windows_console_encoding_is_normalized) ... ok
+test_vendor_background_service_cannot_hold_setup_output_open (__main__.Lifecycle.test_vendor_background_service_cannot_hold_setup_output_open) ... ok
+test_incomplete_prefix_is_backed_up (__main__.Ownership.test_incomplete_prefix_is_backed_up) ... ok
+test_remove_preserves_accounts_and_purge_is_scoped (__main__.Ownership.test_remove_preserves_accounts_and_purge_is_scoped) ... ok
+test_symlinks_and_escape_are_refused (__main__.Ownership.test_symlinks_and_escape_are_refused) ... ok
+test_unmarked_data_is_preserved (__main__.Ownership.test_unmarked_data_is_preserved) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.102s
+
+OK

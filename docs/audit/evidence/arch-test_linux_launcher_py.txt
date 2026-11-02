@@ -1,0 +1,10 @@
+test_close_destroys_window_after_taskkill_timeout (__main__.DesktopLifecycle.test_close_destroys_window_after_taskkill_timeout) ... ok
+test_failed_or_timed_out_query_does_not_claim_client_exit (__main__.DesktopLifecycle.test_failed_or_timed_out_query_does_not_claim_client_exit) ... ok
+test_live_client_is_preserved_for_windows_console_encodings (__main__.DesktopLifecycle.test_live_client_is_preserved_for_windows_console_encodings) ... ok
+test_successful_query_of_absent_client_requests_close (__main__.DesktopLifecycle.test_successful_query_of_absent_client_requests_close) ... ok
+test_taskkill_failure_still_releases_lease_and_local_lock (__main__.DesktopLifecycle.test_taskkill_failure_still_releases_lease_and_local_lock) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.006s
+
+OK

@@ -1,0 +1,7 @@
+gcc 16.2.1+r23+gd564253eb6c8-1
+clang 23.1.4-1
+llvm 23.1.4-1
+python 3.14.9-1
+libmnl 1.0.5-2
+cppcheck 2.22.0-1
+shellcheck 0.11.0-163

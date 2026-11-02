@@ -1,70 +1,60 @@
-# Release-readiness test matrix
+# Validation matrix
 
-Which tests need nothing, which need root, and which need the official ExitLag
-client or a real game. Tests requiring an account or a game are separated so a
-contributor without either can still verify most of the project.
+This matrix describes test scope and acceptance evidence. It does not claim
+that every row has passed in this checkout. See [testing](testing.md) for the
+runner, the [initial audit](audit/INITIAL_AUDIT.md) for the baseline and the
+[roadmap](audit/ROADMAP.md) for planned follow-up work.
 
-## Automated — no account, no game
+## Automated checks
 
-Run with `tests/run-all.sh unit`. Nothing here needs privileges, ExitLag, or a
-network game.
+| Group | Examples | Requirements | Evidence boundary |
+|---|---|---|---|
+| Linux unit | builds, mapping, discovery, assistant, setup simulation, selected RPC cases | compiler/LLVM tools, libmnl, Python and Wine as required by the script | local logic and fixtures; no real game |
+| Installed-client unit | nfapi imports/exports, doctor self-check | user-supplied official client files | static compatibility/diagnostics; no login or relay proof |
+| Privileged IPC | authentication, malformed framing, token rotation, reconnect | root and relevant tools; several cases use `--no-queue` | observed corpus only; a no-queue run does not exercise nftables |
+| Lifecycle | ownership refusal, TERM/INT cleanup, next-start SIGKILL recovery, probe fail-open | root plus usable NFQUEUE/nftables and Wine for shim scenarios | recovery scenarios differ; no guarantee of established relay-session survival |
+| IPv6 rewrite | target validation, real connection, reverse translation, table cleanup | root, netfilter and IPv6; synthetic peer | Linux TCP mechanism, not vendor IPv6 title support |
+| External Wine prefix | mapped probe redirect and unmapped control | root, running official ExitLag, Wine prefixes | probe traffic with a live callback, not full gameplay |
+| Installer/Mac targeted suites | setup, ownership, lease, package and native routing fixtures | platform-specific tools/capabilities | see each suite and package record; not all run through `tests/run-all.sh` |
 
-| Test | What it proves | Requires |
+The runner prints actual totals. A missing official client produces a declared
+skip for installed-client checks; missing privileges or a running client can
+skip their tiers. Other dependencies can fail a test. Record internal skips
+and environment limitations too. Neither a successful wrapper exit nor the
+existence of a test file is sufficient to label every underlying case passed.
+
+## Manual acceptance scenarios
+
+These are instructions for evidence to collect, not a statement that each check
+was completed during development. Private earlier reports are summarized in
+[compatibility](compatibility.md) and [routing stages](pipeline-stages.md).
+
+| Scenario | Evidence to record | Requires |
 |---|---|---|
-| shim builds | the nfapi shim compiles and links | toolchain |
-| helper builds | `exitlag-netd` compiles warning-free | C compiler, libmnl |
-| identity map pos/neg | an exact mapping translates; an unmapped `.exe` argv spoof is refused | — |
-| RPC surface scope | an authenticated peer cannot resolve unreported PIDs, redirect off-box, or crash the helper with malformed privileged requests | — |
-| crash-guard smoketest | the Wine missing-import guards hold; without them this exits non-zero | Wine |
+| Fresh GUI setup/login | platform, vendor/Wine build, wizard result, user ownership and login outcome | clean supported OS, official installer/account |
+| Supported TCP title | new game flow, callback decision, actual bidirectional relay traffic and gameplay duration | account + game |
+| UDP title | callback shape, payload/destination checks, both traffic directions, session outcome | account + UDP game; distinguish login probes from gameplay |
+| Proton launch | exact prefix mapping, launch method, real socket owner and routed/unmapped outcomes | account + Steam/Proton title |
+| ExitLag restart | existing-session outcome separately from new callback/connection recovery | account + game |
+| Game restart | new connection attribution and redirect, stale state and cleanup | account + game |
+| Helper/proxy failure | behavior of existing translated flows and new direct flows recorded separately | isolated controlled environment; account/game for live claims |
+| Network reconnect | interface down/up or actual connectivity change, flow expiry, new connection and gameplay outcome | controlled network + account/game |
+| Sleep/reboot | helper/lease/firewall state and subsequent launch/connect result | supported physical OS |
+| Cleanup | owned helper, table, token, pidfile and stale state after each termination mode | matching privileges |
 
-## Automated — needs root, no account
+SIGKILL recovery is checked on the next authorized start; it cannot be described
+as cleanup performed by a signal trap. A physical reconnect is different from
+contacting an unreachable endpoint. Longer soak, second-machine testing and a
+minimum-OS run require their own dated records.
 
-`sudo tests/run-all.sh system`.
+## Result format
 
-| Test | What it proves |
-|---|---|
-| IPC authentication | wrong uid; correct uid with wrong/all-zero token; correct token; wrong protocol version; token removed on exit; rotated on restart; replayed previous-session token refused |
-| malformed IPC | ten malformed-handshake cases, a routing message sent before authenticating, malformed traffic from an authenticated peer, liveness afterwards, and that the token never reaches the log |
-| heartbeat / reconnect | a connected-but-silent endpoint times out and the shim reconnects to a fresh helper |
-| orphan cleanup | a SIGKILLed runner's helper and table are recovered on the next start |
-| ownership-safe cleanup | a table with no verifiable ownership is refused, not deleted; SIGTERM and SIGINT tear down immediately |
-| fail-open | traffic flows with rules installed and no helper, and survives a helper SIGKILL |
-| repeated cycles | five start/stop cycles leave no table and no helper |
-| unreachable destination | a dead destination neither kills nor wedges the helper |
+For each run, record source commit, package/runtime hashes, OS/kernel and CPU,
+client/Wine/game versions, commands, date, exit codes, pass/fail/skip counts and
+redacted observations. Identify synthetic peers, unavailable capabilities,
+absent account access and incomplete steps explicitly.
 
-## Automated — needs the official client installed
-
-Skipped with a reason when it is absent, since it is not redistributable.
-
-| Test | What it proves | Requires |
-|---|---|---|
-| nfapi ABI | every nfapi symbol the installed client imports is exported by the shim, and every import Wine lacks is covered by a crash guard | ExitLag installed |
-| doctor self-check | the environment is coherent end to end | ExitLag installed |
-| external Wine prefix routing | a Windows process in a *different* prefix is translated and redirected, an unmapped prefix is not, and ExitLag's own process table sees neither | ExitLag **running** + root |
-
-## Live / manual — needs an account and a game
-
-Not automated: these need a human, a subscription, and a supported title. Each
-was performed during development; see `docs/architecture.md` for the evidence.
-
-| Check | How | Requires |
-|---|---|---|
-| ExitLag GUI starts and logs in | `tools/run-exitlag-production.sh`, sign in, enable a game | account |
-| TCP steering with a supported title | start the backend, launch the game, confirm `DNAT armed` and an established relay socket | account + game |
-| UDP steering | same, with a title that sends game UDP; confirm reinjection counts and payload-hash match | account + game |
-| Proton identity routing | map the compatdata prefix, launch through Steam | account + Proton title |
-| ExitLag restart | restart the client with the backend running; the shim reconnects | account |
-| Game restart | restart the game; TCP state expires and re-arms | account + game |
-| Helper crash / fail-open | kill the backend mid-session; the game keeps working unsteered | account + game |
-| Network reconnect | drop and restore connectivity; flows expire and recover | account + game |
-| Clean teardown | stop everything; no `inet exitlag` table, no helper, no lock | — |
-
-## Current status
-
-| Tier | Result |
-|---|---|
-| unit (fresh checkout, no client) | 5 passed, 0 failed, 2 skipped |
-| unit + system + live (full environment) | 10 passed, 0 failed, 0 skipped |
-
-A skip is never counted as a pass, and the runner prints what to install or
-start in order to unskip it.
+There is no timeless "current pass count" in this document. Historical release
+validation remains scoped to its recorded artifacts and environment; new work
+must produce a new record. A skip is never a pass, and a dashboard entry alone
+never upgrades a game to working relay gameplay.

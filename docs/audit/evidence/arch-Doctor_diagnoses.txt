@@ -1,0 +1,26 @@
+=== each failure class is distinguished ===
+  PASS  missing Wine prefix
+  PASS  ExitLag not installed
+  PASS  shim missing
+  PASS  wrong DLL selected
+  PASS  identity map missing
+  PASS  identity map malformed
+  PASS  map source unresolvable
+
+=== capabilities are reported ===
+  PASS  reports IPv4 capability
+  PASS  reports IPv6 capability
+  PASS  IPv6 capability is qualified honestly, not claimed as proven
+
+=== every failure explains itself ===
+  PASS  failures include a 'fix:' line
+
+=== doctor never modifies the system ===
+  PASS  nftables unchanged by running doctor
+  PASS  no state directory created by running doctor
+
+=== exit codes are meaningful ===
+  PASS  non-zero exit when something is broken
+  SKIP  zero exit on a healthy system (ExitLag not installed here)
+
+14 passed, 0 failed

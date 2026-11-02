@@ -1,0 +1,21 @@
+  PASS  found the network-owning process (pid 1220)
+=== never invents a Windows identity ===
+  PASS  windows_identity is null until confirmed
+  PASS  candidates are offered, each with its evidence
+  PASS  suggested source is the client binary
+  PASS  launcher reported separately and flagged as not-the-owner
+
+=== refuses to write without confirmation ===
+  PASS  refuses --append without --windows-identity (exit 2, file untouched)
+
+=== writes only a confirmed entry ===
+  PASS  wrote a tab-separated entry with the confirmed identity
+  PASS  wrote the CLIENT as source, not the launcher
+
+=== idempotent ===
+  PASS  re-running does not duplicate the entry
+
+=== the helper accepts the generated map ===
+  PASS  generated map loads in the real helper
+
+10 passed, 0 failed

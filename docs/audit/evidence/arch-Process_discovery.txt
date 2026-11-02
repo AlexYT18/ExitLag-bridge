@@ -1,0 +1,22 @@
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.004s
+
+OK
+  PASS  infrastructure ports match exactly, including IPv6
+=== launcher vs network-owning client ===
+  PASS  identified the process owning the game socket (pid 1271)
+  PASS  suggested a canonical absolute source path
+  PASS  reported the LAUNCHER separately from the socket-owning client
+  PASS  suggested source is the CLIENT binary, not the launcher
+
+=== shells are not treated as launchers ===
+  PASS  a shell ancestor is not reported as the launcher
+
+=== no spoofable argv heuristic remains ===
+  PASS  identity comes from /proc and socket ownership only (no .exe literal in code)
+
+=== read-only ===
+  PASS  running discovery changes no system state
+
+8 passed, 0 failed

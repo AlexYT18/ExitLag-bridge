@@ -89,9 +89,19 @@ preserved. The shared portable archive contains its own `uninstall.sh`.
 
 Use **Configure games** to select the actual native executable or the game's
 Wine/Proton prefix and enter the Windows executable identity recognized by
-ExitLag. A prefix mapping covers the entire prefix, so separate game prefixes
-are preferable. Unmapped processes retain their normal identity. Apply the game
-in ExitLag's dashboard before establishing new game connections.
+ExitLag. A prefix mapping additionally requires selecting the actual Wine/Proton
+loader executable that owns the game socket, rather than a launcher script.
+Existing two-column prefix mappings must be updated: the third Tab-separated
+column is the absolute loader executable path. Native executable mappings keep
+their two-column format. Paths must exist and executables must be regular files
+with execute permission; duplicate canonical mappings are rejected.
+
+A prefix mapping authorizes the selected loader in the entire prefix, so
+separate game prefixes are preferable. This is an explicit allowlist, not proof
+of the Windows executable running inside that prefix. Unmapped processes retain
+their normal identity. Apply the game in ExitLag's dashboard before establishing
+new game connections. See [process identity translation](../docs/process-identity-translation.md)
+for the mapping format and its trust boundary.
 
 Launching routing uses a graphical polkit administrator prompt. The installed
 root-owned supervisor only runs the installed backend, snapshots data-only game
@@ -120,7 +130,11 @@ private ownership, interrupted setup, interactive vendor handoff and removal.
 `tests/installer_fresh_runtime.py` boots the actual pinned Wine distribution in a
 fresh temporary prefix and verifies the patched WMI class, repeat setup and
 preserved data. No real account or proprietary executable is used in CI.
-Desktop/supervisor checks are in `tests/test_linux_desktop.py`.
+Desktop/supervisor checks are in `tests/test_linux_desktop.py` and
+`tests/test_linux_launcher.py`. The latter runs without opening a Tk window and
+covers Windows-console encodings, uncertain process queries and cleanup after a
+Wine timeout. Routing leases accept timestamps only within the previous six
+seconds; a backwards wall-clock jump stops the session until it is restarted.
 
 Installer checks do not prove routing for every game. Reports must distinguish
 world gameplay, character selection, synthetic tests and untested games. Submit

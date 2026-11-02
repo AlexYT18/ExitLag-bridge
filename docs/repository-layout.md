@@ -1,94 +1,76 @@
 # Repository layout
 
-The project grew through reverse engineering, so the tree separates what the
-runtime needs from what was used to discover it. Nothing was deleted; research
-material moved rather than disappearing.
+This is a public source snapshot. Earlier research trees, private captures and
+configured Wine prefixes are not tracked here. Historical references to them
+in development notes describe material unavailable in this checkout; they are
+not installation prerequisites. See the [initial audit](audit/INITIAL_AUDIT.md)
+and [roadmap](audit/ROADMAP.md).
 
-## Production — required to run
-
-```text
-backend/          the privileged Linux helper and its nftables surface
-  exitlag-netd.c    NFQUEUE helper: attribution, IPC, TCP DNAT, UDP reinjection
-  protocol.h        shim <-> helper wire format
-  Makefile
-  nft-setup.sh      installs the dedicated `inet exitlag` table
-  nft-teardown.sh   removes it (single atomic delete)
-  runtime-guard.sh  sourced lifecycle ownership: flock, pidfile, orphan recovery
-  run-tcp-redirect.sh   active TCP runner
-  run-udp-steer.sh      active TCP + narrow UDP runner
-  run-passive.sh        observation only, never mutates
-  run-udp-observe.sh    UDP observation only
-  identity-map.example  documented configuration template
-
-shim/
-  nfapi/            the nfapi.dll ABI shim ExitLag loads (build.sh, *.def)
-  nfextlag/         driver-name compatibility surface
-
-wine-wbemprox/    prefix-local Wine WMI patch (Win32_LogicalDiskRootDirectory)
-
-tools/            user-facing entry points
-  exitlag-setup.sh             guided install / status / uninstall (idempotent)
-  exitlag-doctor.sh            pre-flight diagnosis; changes nothing
-  discover-game-processes.py   which process actually owns the game's sockets
-  identity-map-assistant.py    turn that into a map entry (Windows side confirmed)
-  run-exitlag-production.sh    production launcher, no research instrumentation
-  run-exitlag-gameprefix.sh    same prefix with the research trace enabled
-  check-exitlag-version.sh     ExitLag build-drift detection
-  install-nfextlag-stub.sh / remove-nfextlag-stub.sh
-  install-wbemprox-prefix-override.sh / restore-wbemprox-prefix-override.sh
-```
-
-## tests/ — automated verification
-
-Runnable by anyone; only some need a live ExitLag.
+## Source and installation
 
 ```text
-harden-runtime-test.sh        lifecycle/failure scenarios (needs sudo)
-validate-external-prefix.sh   external Wine prefix routing (needs sudo + ExitLag)
-test-identity-map.sh          identity translation, IPC only, no privileges
-discovery-test.sh             launcher-versus-client detection
-identity-assistant-test.sh    never invents a Windows identity
-setup-simulation-test.sh      fresh install, idempotence, recovery, uninstall
-ipc-fuzz-test.sh              hostile input after authentication (needs sudo)
-ipv6-redirect-test.sh         synthetic IPv6 active rewrite (needs sudo)
-doctor-test.sh                each failure class is distinguished
-test-shim-reconnect.sh        heartbeat timeout and reconnect
-test-external-route.sh        external routing smoke test
-test-tcp-redirect.py          TCP callback loop
-test-udp-observe.py           UDP lifecycle
-build-nfapi-compat-smoketest.sh + nfapi-compat-smoketest.cpp
-                              crash-guard regression against Wine stub imports
-nfapi-reconnect-smoketest.cpp
-verify-nfapi-abi.sh           shim export/ABI sanity
-external-probe/               minimal Windows TCP probe for prefix tests
-fakegame/                     placeholder Windows process
+backend/          Linux NFQUEUE helper, wire protocol, nftables and runner lifecycle
+shim/nfapi/       Windows-side nfapi compatibility DLL
+shim/nfextlag/    presence-only driver compatibility stub
+wine-wbemprox/   Wine WMI patch and developer build scripts
+macos/           native Mac routing backend and app/privileged-helper sources
+installers/      shared setup, pinned runtime catalog and Linux packaging
 ```
 
-## research/ — how the design was discovered
+`backend/exitlag-netd.c` coordinates attribution, callbacks and packet decisions.
+`backend/protocol.h` defines the EXL1 wire layout. The active developer runners
+use `backend/runtime-guard.sh` for lock/pidfile ownership and recovery, and
+`nft-setup.sh` / `nft-teardown.sh` for the dedicated firewall table. Packaged
+routing uses installed supervisors; developer runners are not the ordinary
+user launch path.
 
-Not required to run anything. Kept because it documents the reverse
-engineering and would be expensive to recreate.
+The WMI patch can be built with a project-local Wine for developer use.
+Packaged setup instead prepares the pinned runtime and replacement payload
+through `installers/`. See [Wine setup](wine-setup.md) and the
+[installer guide](../installers/README.md).
+
+## Developer tools
 
 ```text
-reversing/          PE analysis, disassembly helpers, handle comparison
-probes/             one-off Windows probes: WMI, WebView2, nfextlag surface,
-                    GetExtendedTcpTable, shim smoke/policy tests
-wine-experiments/   Wine bring-up, prefix experiments, synthetic callback
-                    injection, gate sessions, game installation helpers
-ui/                 screenshot and window-interaction helpers
-stage3a-probe.py, stage3a-discriminate.py
-                    early flow-discrimination experiments
+tools/exitlag-setup.sh             install / status / uninstall developer setup
+tools/exitlag-doctor.sh            pre-flight environment diagnostics
+tools/discover-game-processes.py   network-owning process discovery
+tools/identity-map-assistant.py    mapping with a confirmed Windows identity
+tools/run-exitlag-production.sh    launcher without research behavior overrides
+tools/run-exitlag-gameprefix.sh    diagnostic launcher
+tools/check-exitlag-version.sh     comparison with a local build baseline
+tools/check-exitlag-abi.sh         imported symbols and Wine guard compatibility
+tools/audit-source.py             source privacy checks
 ```
 
-## runtime/ — machine-specific, not portable
+The `install-wbemprox-prefix-override.sh` / restore scripts retain an earlier
+experiment's diagnostic/reversal path. The install script refuses that obsolete
+deployment method; it is not a working alternative WMI installer.
 
-Wine prefixes, session logs, captured evidence, and checkpoint backups. Almost
-all of it is generated and much is specific to this machine. See
-`THIRD_PARTY.md` and `docs/provenance-review.md` before publishing.
+## Tests, documentation and licenses
 
-## What the runtime must never depend on
+`tests/run-all.sh` selects the Linux unit/system/live tiers. Other targeted
+suites live beside the Linux installer, Mac backend and app. The presence of a
+test file does not mean it is registered in that runner or has passed in the
+current environment. See [testing](testing.md) and the [test matrix](test-matrix.md).
 
-The production path does not use synthetic callback injectors, memory scanners,
-disassembly output, or research-only environment variables. `research/` can be
-deleted entirely and the runtime still works; the test suite will still pass
-except for the tests that live there.
+`docs/` contains user/technical documentation and the static project website.
+`docs/releases/` contains historical release validation records, not current
+runtime state. `docs/audit/` contains the source audit, inventory, evidence and
+planned follow-up work. `LICENSE`, `LICENSES/` and `THIRD_PARTY.md` describe the
+first-party license and retained upstream notices; original notices retain
+their own terms.
+
+## Generated and private state
+
+Developer scripts may create `runtime/` for Wine prefixes, baselines, logs and
+session metadata, and `vendor/` for build inputs. Generated build/output trees
+are ignored as listed in `.gitignore`. These directories are not tracked
+research archives and must not be published wholesale. Installed applications
+also keep user/account state outside the source tree.
+
+The production launcher clears synthetic-injection and export-policy research
+overrides. Source build, packaging and tests should not require an omitted
+private trace or research tree. If a diagnostic message points to an absent
+historical file, report that reference rather than treating it as bundled
+runtime evidence.

@@ -1,104 +1,105 @@
-# The four stages, and which of them we control
+# Routing stages and evidence
 
-Most confusion about this project's results comes from collapsing four distinct
-things into "does it work". They fail independently, and only one of them is
-ours.
+Game recognition, callback delivery, the routing decision and packet steering
+are separate stages. A result at one stage does not establish success at the
+next. The bridge implements stages 2 and 4, and its compatibility behavior can
+also affect what the official client observes and decides.
 
 ```text
-1. DETECTION          does ExitLag know the game is running?
-        |                 ExitLag's own Process32NextW over its Wine prefix.
-        |                 Cannot see native Linux, Proton, or other prefixes.
+1. DETECTION          does the official client recognize the game?
+        |                 Its process enumeration is limited by its Wine prefix.
         v
-2. INSPECTION         does traffic reach ExitLag as events it can meter?
-        |                 Our backend: attribution, identity translation, the
-        |                 nfapi callbacks. THIS IS OURS.
+2. INSPECTION         does traffic reach the routing callback?
+        |                 Bridge attribution, identity mapping and nfapi events.
         v
-3. DECISION           does ExitLag ask for a redirect?
-        |                 Entirely ExitLag's logic. It may return no address at
-        |                 all, and often does.
+3. DECISION           does the official client return a usable redirect?
+        |                 Vendor logic consumes the supplied callback data.
         v
-4. APPLICATION        does the redirect get applied to real packets?
-                          Our backend: nftables DNAT, reverse translation,
-                          fail-open. THIS IS OURS.
+4. APPLICATION        is that redirect applied to real packets?
+                          Native steering, reverse translation and cleanup.
 ```
 
-Stages 2 and 4 are this project. Stages 1 and 3 belong to ExitLag, and every
-failure observed so far has been in one of those.
+A dashboard session or byte counter can be evidence of inspection without a
+redirect. A redirect log can show an attempted decision without demonstrating
+bidirectional relay traffic or stable gameplay. Failures require investigation
+across this boundary; they cannot be assigned to the vendor solely because a
+bridge test passed.
 
-A game can reach stage 2 and stop: ExitLag meters it, shows a session, and never
-asks for a redirect. That is not a partial success of routing — it is
-recognition without steering, and the UI looks identical either way.
+See the [initial audit](audit/INITIAL_AUDIT.md),
+[compatibility record](compatibility.md) and [roadmap](audit/ROADMAP.md).
 
-## Per-game evidence
+## Historical per-game observations
 
-Stated as measured. Hypotheses are marked as such.
+These summarize the earlier Linux development reports. The original private
+captures and machine state are not included in this checkout. These are not
+new measurements of the current installer, and the counts below do not imply
+present-day compatibility.
 
-| Game | 1. Detection | 2. Inspection | 3. ExitLag decision | 4. Applied | Session survives |
+| Game | Detection in vendor process list | Inspection | Redirect reported | Applied traffic | Gameplay result |
 |---|---|---|---|---|---|
-| **WoW** (Wine prefix) | yes | yes | redirect offered | **yes** | **yes** |
-| **Dota 2** (native) | no — invisible to ExitLag | **yes**, metered in its UI | **no address offered** | n/a | n/a |
-| **Minecraft** (native) | no | yes | redirect offered | **yes** | **no** — ExitLag closes it |
-| **Tibia** (native) | no | yes | **no address offered** | n/a | n/a |
+| WoW Classic Era, Wine | reported | reported | reported | TCP world traffic; separate UDP login-probe experiment | Working on the maintainer's original Arch setup |
+| Dota 2, native Linux | not observed | UI session/metering reported | none in the recorded session | not established | Detection/inspection only |
+| Minecraft Java, native Linux | not observed | reported | reported | relay traffic reported | Sessions disconnected |
+| Tibia, native Linux | not observed | reported | none in the recorded session | not established | Detection/inspection only |
 
-### WoW
-Real TCP and UDP steering proven with live game traffic: destination rewritten
-to ExitLag's local proxy, sockets established through play, and UDP
-take-and-reinject with 20/20 payload hashes matching and no packet loss.
+### WoW Classic Era
 
-### Dota 2 (native Linux)
-Recognition and metering proven — ExitLag's UI showed the session, the correct
-game server and a live ping, for a process it cannot see, without the game being
-restarted. It never requested a redirect: `mutated=none` on all 12
-`udpConnectRequest` returns, zero `nf_udpPostSend`, zero remote-address rules,
-while processing 8515 inbound datagrams.
+Historical TCP tests reported translation to the official client's local proxy
+and established world-server sockets through gameplay. The separate active UDP
+experiment reported 20/20 matching payload hashes and no ENOBUFS errors for the
+tested datagrams. The report identifies these UDP packets as realm-list latency
+probes at login, not in-world UDP gameplay. Neither result proves UDP support
+for another title.
 
-Relay distance was tested and ruled out: switching the region to North America,
-verified applied, produced the same result. Dota uses Steam Datagram Relay, so
-the endpoints are Valve relays rather than game servers. **That transport is the
-most consistent explanation, but it is inference from ExitLag's behaviour, not a
-fact about its internals.**
+### Dota 2
 
-### Minecraft (native Linux)
-The only case where a native Linux game was steered end to end: identity
-translated, `DNAT armed`, 803 KB carried through ExitLag's Miami relay. Six
-connections across four servers were all steered and all disconnected.
+The earlier report describes a dashboard session with the expected endpoint and
+ping, despite the native process being outside ExitLag's Wine prefix. In that
+sample, 12 `udpConnectRequest` returns offered no address mutation, with zero
+`nf_udpPostSend` calls and no remote-address rules while 8515 incoming datagrams
+were observed. Working relay steering was not established.
 
-A packet capture on both legs shows **ExitLag closing the session itself** 4.493 s
-in — it FINs both relay legs and then the local proxy within 200 µs, unprovoked,
-while the relays are still delivering data; one was reset for sending after the
-FIN. No RST from any peer, no retransmissions, no zero-window. Reverse NAT was
-verified correct in the same capture.
+Changing the selected region reportedly did not change that sample's outcome.
+Steam Datagram Relay was proposed as an explanation, but the experiment does
+not establish the vendor's internal reason or exclude a bridge compatibility
+problem.
 
-A single-variable A/B settles whose fault it is: with ExitLag routing Minecraft
-the session dies on every server; with it toggled off — backend still running,
-failing open — the game works normally.
+### Minecraft Java
 
-**Whether Windows behaves the same is unknown and needs a Windows ExitLag
-install.** A ~4.5 s lifetime with healthy peers has the shape of a timer, but
-the mechanism is not observable from outside a closed binary and is not claimed.
+The earlier report describes six steered connections across four servers and
+803 KB carried through a relay. All sessions disconnected. The private capture
+was reported to show FINs from the ExitLag side after about 4.5 seconds, with
+reverse NAT apparently correct in that sample.
 
-### Tibia (native Linux)
-Discovery mattered here: `~/Games/Tibia/Tibia` is a launcher, and the game is
-`~/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client`. Mapping the
-launcher translated only its HTTPS.
+Disabling the route while leaving the backend running reportedly allowed direct
+play. This comparison narrows the failure to the routed configuration; it does
+not identify whether the cause is vendor policy, a callback/transport mismatch,
+or another bridge defect. A comparable Windows control and a fresh reproducer
+are not recorded here. Minecraft remains **unstable**, not supported gameplay.
 
-With the real client mapped and in-world, every flow is IPv6 to a CDN on `:443` —
-no `7171`/`7172` at all. ExitLag returned the filtering flag and no address.
-Two constraints would prevent steering and only one is reached: **ExitLag
-offering no address is the binding one**; this project's IPv4-only rewrite (since
-lifted) was never consulted.
+### Tibia
 
-### IPv6 TCP rewrite
-Mechanism proven synthetically through the production path — real helper, real
-nftables, real IPv6 connection, reverse translation intact, illegal targets
-refused. **No ExitLag-provided IPv6 redirect has been observed in any real
-game.** It is a capability that is correct and, so far, unused.
+The earlier discovery experiment distinguished the launcher from the actual
+network-owning game client. Mapping the launcher alone translated its HTTPS
+traffic, which did not establish routing for the game.
 
-## What this means for the project
+With the client mapped and in-world, the recorded flows used IPv6 on port 443;
+the callback returned a filtering flag without a destination address. No usable
+redirect was available to apply in that experiment. Adding IPv6 TCP rewrite
+does not by itself change that observation or establish Tibia support.
 
-Every failure has landed in stage 1 or stage 3 — ExitLag's detection and
-ExitLag's decision. Stages 2 and 4 have not failed once across four games and
-three transports.
+### IPv6 TCP mechanism
 
-That is the strongest available statement about a compatibility layer, and it is
-also the limit of what this project can fix from here.
+`tests/ipv6-redirect-test.sh` supplies a synthetic authenticated peer to the
+production helper and checks an IPv6 connection, DNAT, reverse translation,
+invalid-target refusal and teardown. Historical results are described in
+[IPv6 active rewrite](ipv6-active-rewrite.md). No real game receiving an
+ExitLag-provided IPv6 redirect is recorded here.
+
+## How to extend the record
+
+For each new result, record the source/artifact revision, OS/kernel, client and
+Wine versions, game build, transport and launch method. Identify each stage
+actually observed, distinguish logs from packet/relay evidence, and record
+session duration, restart and cleanup outcomes. Mark skipped or untested steps
+explicitly. Use redacted summaries rather than private captures or account data.
