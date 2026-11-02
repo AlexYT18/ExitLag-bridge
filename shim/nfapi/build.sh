@@ -4,11 +4,14 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 build_dir="$script_dir/build"
 
-command -v clang-cl >/dev/null
+source "$script_dir/../llvm-toolchain.sh"
 command -v lld-link >/dev/null
 command -v llvm-dlltool >/dev/null
 
 mkdir -p "$build_dir"
+# CL-style drivers parse an absolute /workspace/... source as a /w option.
+# Compile relative to this directory; retain absolute output destinations.
+cd "$script_dir"
 
 llvm-dlltool \
     -m i386:x86-64 \
@@ -25,7 +28,7 @@ llvm-dlltool \
     -d "$script_dir/iphlpapi.def" \
     -l "$build_dir/iphlpapi.lib"
 
-clang-cl \
+"${EXITLAG_CL_DRIVER[@]}" \
     /nologo \
     /c \
     /O2 \
@@ -34,7 +37,7 @@ clang-cl \
     /GR- \
     /EHs-c- \
     /Zl \
-    "$script_dir/nfapi_stub.cpp" \
+    nfapi_stub.cpp \
     "/Fo$build_dir/nfapi_stub.obj"
 
 lld-link \

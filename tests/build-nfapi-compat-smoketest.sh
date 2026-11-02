@@ -4,13 +4,15 @@ set -euo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 shim_dir="$repo_root/shim/nfapi"
 build_dir="$shim_dir/build"
-source_file="$repo_root/tests/nfapi-compat-smoketest.cpp"
+source_file="tests/nfapi-compat-smoketest.cpp"
 object_file="$repo_root/tests/nfapi-compat-smoketest.obj"
 output_file="$repo_root/tests/nfapi-compat-smoketest.exe"
+source "$repo_root/shim/llvm-toolchain.sh"
 
 "$shim_dir/build.sh" >/dev/null
+cd "$repo_root"
 
-clang-cl /nologo /c /O2 /GS- /GR- /EHs-c- /Zl \
+"${EXITLAG_CL_DRIVER[@]}" /nologo /c /O2 /GS- /GR- /EHs-c- /Zl \
     "$source_file" "/Fo$object_file"
 
 # Import libraries for the two functions Wine does not export. Declaring them

@@ -5,6 +5,8 @@
 // EXITLAG_NFAPI_SUCCEED, EXITLAG_NFAPI_EXTVER, and EXITLAG_NFAPI_INJECT are isolated
 // research overrides and are not needed by the normal runtime.
 
+#include "ipc_validation.h"
+
 typedef void *HANDLE;
 typedef unsigned long DWORD;
 typedef int BOOL;
@@ -1201,95 +1203,6 @@ static void stop()
 // ExitLag from a path that could be re-entered by the helper.
 // ---------------------------------------------------------------------------
 
-#define EXL_MAGIC 0x314c5845u
-#define EXL_PROTOCOL_VERSION 3
-#define EXL_TOKEN_BYTES 32
-#define EXL_MSG_HELLO 0x0001
-#define EXL_MSG_HELLO_ACK 0x0002
-#define EXL_MSG_PING 0x0003
-#define EXL_MSG_PONG 0x0004
-#define EXL_MSG_TCP_CONNECT_REQ 0x0010
-#define EXL_MSG_TCP_CONNECT_REPLY 0x0011
-#define EXL_MSG_RESOLVE_PID_REQ 0x0020
-#define EXL_MSG_RESOLVE_PID_REPLY 0x0021
-#define EXL_MSG_UDP_CREATED_REQ 0x0040
-#define EXL_MSG_UDP_CREATED_REPLY 0x0041
-#define EXL_MSG_UDP_CONNECT_REQ 0x0042
-#define EXL_MSG_UDP_CONNECT_REPLY 0x0043
-#define EXL_MSG_UDP_DATAGRAM_REQ 0x0044
-#define EXL_MSG_UDP_DATAGRAM_REPLY 0x0045
-#define EXL_MSG_UDP_POST 0x0046
-#define EXL_MSG_UDP_STATE 0x0047
-#define EXL_MSG_UDP_CLOSED_REQ 0x0048
-#define EXL_MSG_UDP_CLOSED_REPLY 0x0049
-#define EXL_VERDICT_UNCHANGED 0
-#define EXL_VERDICT_MUTATED 1
-#define EXL_VERDICT_NO_HANDLER 2
-#define EXL_UDP_API_POST_SEND 1
-#define EXL_UDP_API_POST_RECEIVE 2
-#define EXL_UDP_API_ADD_REMOTE_RULE 3
-#define EXL_UDP_API_DISABLE_FILTERING 4
-#define EXL_UDP_API_ENABLE_FILTERING 5
-#define EXL_UDP_API_SET_FLOWCTL 6
-
-#pragma pack(push, 1)
-struct exl_header { unsigned int magic; unsigned short type; unsigned short flags; unsigned int length; };
-struct exl_hello { unsigned int version; unsigned int shim_process_id; unsigned __int64 capabilities;
-                   unsigned char token[EXL_TOKEN_BYTES]; };   // must match backend/protocol.h
-struct exl_hello_ack { unsigned int version; unsigned int helper_pid; unsigned __int64 capabilities; };
-struct exl_tcp_connect_req {
-    unsigned __int64 tag; unsigned __int64 endpoint_id; unsigned int process_id;
-    unsigned int filtering_flag; unsigned char direction; unsigned char reserved[3];
-    unsigned short ip_family; unsigned char local_address[28]; unsigned char remote_address[28];
-};
-struct exl_resolve_pid_req { unsigned __int64 tag; unsigned int process_id; unsigned int reserved; };
-struct exl_resolve_pid_reply { unsigned __int64 tag; unsigned int path_length; unsigned int reserved; };
-struct exl_tcp_connect_reply {
-    unsigned __int64 tag; unsigned int verdict; unsigned int filtering_flag;
-    unsigned char remote_address[28]; unsigned char mutated_flag; unsigned char mutated_remote;
-    unsigned char reserved[2];
-};
-struct exl_udp_lifecycle_req {
-    unsigned __int64 tag; unsigned __int64 endpoint_id; unsigned int process_id;
-    unsigned short ip_family; unsigned char local_address[28];
-};
-struct exl_udp_lifecycle_reply {
-    unsigned __int64 tag; unsigned int verdict; unsigned int process_id;
-    unsigned short ip_family; unsigned char local_address[28];
-    unsigned char mutated_info; unsigned char reserved[3];
-};
-struct exl_udp_connect_req {
-    unsigned __int64 tag; unsigned __int64 endpoint_id; unsigned int process_id;
-    unsigned int filtering_flag; unsigned short ip_family;
-    unsigned char local_address[28]; unsigned char remote_address[28];
-};
-struct exl_udp_connect_reply {
-    unsigned __int64 tag; unsigned int verdict; unsigned int process_id;
-    unsigned int filtering_flag; unsigned char remote_address[28];
-    unsigned char mutated_flag; unsigned char mutated_remote; unsigned char reserved[2];
-};
-struct exl_udp_datagram_req {
-    unsigned __int64 tag; unsigned __int64 endpoint_id; unsigned int process_id;
-    unsigned char direction; unsigned char reserved; unsigned short ip_family;
-    unsigned char local_address[28]; unsigned char remote_address[28];
-    unsigned int option_flags; unsigned int options_length; unsigned int payload_length;
-};
-struct exl_udp_datagram_reply {
-    unsigned __int64 tag; unsigned int verdict; unsigned int post_count;
-    unsigned int remote_rule_count; unsigned int control_count;
-    unsigned char mutated_remote; unsigned char mutated_payload;
-    unsigned char mutated_options; unsigned char reserved;
-};
-struct exl_udp_post {
-    unsigned __int64 event_tag; unsigned __int64 endpoint_id; unsigned int api; int status;
-    unsigned char remote_address[28]; unsigned int option_flags;
-    unsigned int options_length; unsigned int payload_length;
-};
-struct exl_udp_state {
-    unsigned __int64 event_tag; unsigned __int64 endpoint_id; unsigned int api; int status;
-    unsigned int value; unsigned int data_length;
-};
-#pragma pack(pop)
 
 namespace ipc {
 
@@ -1351,7 +1264,7 @@ static bool send_message(SOCKET s, unsigned short type, const void *payload, uns
 static int resolve_linux_pid(unsigned int pid, wchar_t *buffer, unsigned long length)
 {
     SOCKET s = g_socket;
-    if (s == INVALID_SOCKET) return 0;
+    if (s == INVALID_SOCKET || !buffer || !length) return 0;
     exl_resolve_pid_req req;
     req.tag = ++g_tag; req.process_id = pid; req.reserved = 0;
     if (!send_message(s, EXL_MSG_RESOLVE_PID_REQ, &req, sizeof(req))) return 0;
@@ -1359,19 +1272,15 @@ static int resolve_linux_pid(unsigned int pid, wchar_t *buffer, unsigned long le
     for (;;) {
         exl_header head;
         if (!recv_all(s, (char *)&head, (int)sizeof(head))) return 0;
-        if (head.magic != EXL_MAGIC || head.length > 65536) return 0;
-        static char payload[131072];
+        if (!exl_ipc_validation::valid_frame_header(head)) return 0;
+        static char payload[EXL_MAX_PAYLOAD];
         if (head.length && !recv_all(s, payload, (int)head.length)) return 0;
-        if (head.type != EXL_MSG_RESOLVE_PID_REPLY || head.length < sizeof(exl_resolve_pid_reply)) continue;
+        if (head.type != EXL_MSG_RESOLVE_PID_REPLY) continue;
+        if (head.length < sizeof(exl_resolve_pid_reply)) return 0;
         const exl_resolve_pid_reply *reply = (const exl_resolve_pid_reply *)payload;
         if (reply->tag != req.tag) continue;
-        unsigned int n = reply->path_length;
-        if (!n) return 0;
-        if (n > length - 1) n = (unsigned int)(length - 1);
-        const char *path = payload + sizeof(*reply);
-        for (unsigned int i = 0; i < n; ++i) buffer[i] = (wchar_t)(unsigned char)path[i];
-        buffer[n] = 0;
-        return 1;
+        return exl_ipc_validation::copy_pid_reply_path(*reply, payload, head.length,
+                                                      buffer, length) ? 1 : 0;
     }
 }
 
@@ -1809,28 +1718,6 @@ static void handle_udp_datagram(exl_udp_datagram_req &req, unsigned int frame_le
     trace::finish(post);
 }
 
-// "host:port" (ASCII) -> sockaddr_in. Only IPv4 loopback is expected.
-static bool parse_endpoint(const wchar_t *text, unsigned char *sockaddr_out)
-{
-    unsigned int octet[4] = {127, 0, 0, 1};
-    unsigned int port = 51900;
-    const wchar_t *p = text;
-    unsigned int value = 0; int index = 0; bool have_digits = false;
-    for (; *p && *p != L':'; ++p) {
-        if (*p >= L'0' && *p <= L'9') { value = value * 10 + (unsigned)(*p - L'0'); have_digits = true; }
-        else if (*p == L'.' && index < 3) { octet[index++] = value; value = 0; have_digits = false; }
-        else return false;
-    }
-    if (!have_digits || index != 3) return false;
-    octet[3] = value;
-    if (*p == L':') { port = 0; for (++p; *p >= L'0' && *p <= L'9'; ++p) port = port * 10 + (unsigned)(*p - L'0'); }
-    if (!port || port > 65535) return false;
-    for (int i = 0; i < 16; ++i) sockaddr_out[i] = 0;
-    sockaddr_out[0] = 2; sockaddr_out[1] = 0;                 /* AF_INET */
-    sockaddr_out[2] = (unsigned char)(port >> 8); sockaddr_out[3] = (unsigned char)port;
-    for (int i = 0; i < 4; ++i) sockaddr_out[4 + i] = (unsigned char)octet[i];
-    return true;
-}
 
 /*
  * Read this session's IPC token. The helper writes 64 hex characters to a file
@@ -1890,7 +1777,7 @@ static DWORD WINAPI thread_main(void *)
     if (!size || size >= sizeof(endpoint) / sizeof(endpoint[0])) return 0;
 
     unsigned char address[16];
-    if (!parse_endpoint(endpoint, address)) {
+    if (!exl_ipc_validation::parse_loopback_endpoint(endpoint, address)) {
         trace::line bad; trace::prefix(bad, "ipc.config");
         bad.text(" error=bad-endpoint value="); bad.wide_ascii(endpoint, 128); trace::finish(bad);
         return 0;
@@ -1936,11 +1823,11 @@ static DWORD WINAPI thread_main(void *)
             trace::finish(out);
         }
 
-        static char payload[65536];
+        static char payload[EXL_MAX_PAYLOAD];
         while (ok && g_running) {
             exl_header head;
             if (!recv_all(s, (char *)&head, (int)sizeof(head))) break;
-            if (head.magic != EXL_MAGIC || head.length > sizeof(payload)) break;
+            if (!exl_ipc_validation::valid_frame_header(head)) break;
             if (head.length && !recv_all(s, payload, (int)head.length)) break;
 
             if (head.type == EXL_MSG_HELLO_ACK && head.length >= sizeof(exl_hello_ack)) {
