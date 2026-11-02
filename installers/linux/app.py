@@ -20,7 +20,7 @@ import webbrowser
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'installers'))
-from bridge_setup.core import Setup, default_state, find_client
+from bridge_setup.core import Setup, console_output, default_state, find_client
 from bridge_setup.util import State, private_json, read_private
 
 
@@ -95,7 +95,7 @@ class Desktop:
         except (OSError, ValueError) as error:
             messagebox.showerror('Setup directory', str(error)); return
         dialog = tk.Toplevel(self.window); dialog.title('Game mappings'); dialog.geometry('680x400')
-        ttk.Label(dialog, text='One mapping per line: game path, a Tab, then its Windows executable path.\nUse the executable that owns the game connection. A Wine-prefix mapping covers that whole prefix.', wraplength=640).pack(padx=16, pady=12, anchor='w')
+        ttk.Label(dialog, text='Executable mappings: game path, a Tab, then its Windows executable identity.\nWine-prefix mappings also require a third Tab column: the actual Wine/Proton loader executable. They authorize that loader in the whole prefix; separate game prefixes are preferable.', wraplength=640).pack(padx=16, pady=12, anchor='w')
         editor = tk.Text(dialog, wrap='none', height=12); editor.pack(padx=16, fill='both', expand=True)
         path = self.state / 'games.map'
         if path.exists():
@@ -103,10 +103,16 @@ class Desktop:
         def add(prefix=False):
             selected = filedialog.askdirectory(title='Game Wine prefix') if prefix else filedialog.askopenfilename(title='Game executable')
             if selected:
+                loader = None
+                if prefix:
+                    loader = filedialog.askopenfilename(title='Actual Wine/Proton loader executable that owns the game socket')
+                    if not loader:
+                        return
                 identity = simpledialog.askstring('Windows game identity', 'Windows executable path recognized by ExitLag (for example C:\\Games\\World of Warcraft\\_classic_era_\\WowClassic.exe):', parent=dialog)
                 if identity:
                     source = ('wineprefix:' if prefix else '') + str(Path(selected).resolve())
-                    editor.insert('end', source + '\t' + identity + '\n')
+                    owner = '\t' + str(Path(loader).resolve()) if loader else ''
+                    editor.insert('end', source + '\t' + identity + owner + '\n')
         def save():
             text = editor.get('1.0', 'end').strip() + '\n'
             # Same parser used by the installed supervisor, running unprivileged here.
@@ -184,30 +190,34 @@ class Desktop:
                     self.stop_session()
             elif time.time() - self.started > 25 and time.time() - self.last_check > 5 and not self.checking:
                 self.last_check = time.time(); self.checking = True
-                def check_client():
-                    try:
-                        env = os.environ.copy(); env.update(WINEPREFIX=str(self.state / 'prefix'), WINEDEBUG='-all')
-                        result = subprocess.run([str(self.state / 'runtime/bin/wine'), 'tasklist.exe', '/FI', 'IMAGENAME eq ExitLag.exe', '/NH'], env=env, capture_output=True, timeout=10)
-                        if result.returncode == 0 and b'exitlag.exe' not in result.stdout.lower():
-                            self.events.put(('client_closed',))
-                    except (OSError, subprocess.TimeoutExpired):
-                        pass
-                    finally: self.checking = False
-                threading.Thread(target=check_client, daemon=True).start()
+                threading.Thread(target=self.check_client, daemon=True).start()
         self.window.after(500, self.poll)
+
+    def check_client(self):
+        try:
+            env = os.environ.copy(); env.update(WINEPREFIX=str(self.state / 'prefix'), WINEDEBUG='-all')
+            result = subprocess.run([str(self.state / 'runtime/bin/wine'), 'tasklist.exe', '/FI', 'IMAGENAME eq ExitLag.exe', '/NH'], env=env, capture_output=True, timeout=10)
+            if result.returncode == 0 and b'exitlag.exe' not in console_output(result.stdout).lower():
+                self.events.put(('client_closed',))
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        finally:
+            self.checking = False
 
     def stop_session(self):
         (self.state / 'desktop.lease').unlink(missing_ok=True)
-        if self.client:
-            env = os.environ.copy(); env.update(WINEPREFIX=str(self.state / 'prefix'), WINEDEBUG='-all')
-            subprocess.run([str(self.state / 'runtime/bin/wine'), 'taskkill.exe', '/IM', 'ExitLag.exe', '/F'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+        try:
+            if self.client:
+                env = os.environ.copy(); env.update(WINEPREFIX=str(self.state / 'prefix'), WINEDEBUG='-all')
+                subprocess.run([str(self.state / 'runtime/bin/wine'), 'taskkill.exe', '/IM', 'ExitLag.exe', '/F'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+        except (OSError, subprocess.TimeoutExpired):
+            self.message.set('ExitLag could not be closed automatically. Close its window if it is still open.')
+        finally:
             self.client = None
-        if self.helper and self.helper.poll() is None:
-            # The elevated supervisor watches this process; it stops after exit.
-            pass
-        self.helper = None
-        if self.lock is not None:
-            os.close(self.lock); self.lock = None
+            # Removing the lease stops the elevated supervisor independently of Wine.
+            self.helper = None
+            if self.lock is not None:
+                os.close(self.lock); self.lock = None
 
     def close(self):
         if self.busy:

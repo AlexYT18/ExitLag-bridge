@@ -68,6 +68,7 @@ macos/app/dist/
 
 # Build locally; do not commit machine-specific compiled helpers.
 /backend/exitlag-netd
+/backend/ipc-transport-test
 
 installers/**/__pycache__/
 installers/payloads/

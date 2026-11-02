@@ -48,6 +48,7 @@
 #include <unistd.h>
 
 #include "protocol.h"
+#include "ipc_transport.h"
 
 /*
  * Wine hands the socket fd to the application only after wineserver has created
@@ -87,10 +88,10 @@ static uid_t g_allowed_peer_uid = (uid_t)-1;
 
 /*
  * Per-session IPC token. The uid check stops other accounts; it cannot stop
- * another process of the same user, which is the remaining impersonation gap.
- * The token closes it: it is generated fresh on every start, written to a file
- * only the owning user can read, and must be presented in the handshake before
- * any routing command is served.
+ * another process of the same user. The token is generated fresh on every
+ * start and must be presented before any routing command is served. It prevents
+ * cross-account access and stale-session replay; it does not isolate processes
+ * within the owning account because they can read that account's token file.
  *
  * It is never logged, never written anywhere but that one file, and the file is
  * removed on exit. A token from a previous session is useless because a new one
@@ -141,9 +142,9 @@ static const char *g_selftest;    /* synthesize one flow to this IPv4 dest */
 static FILE *g_log;
 
 /*
- * Production process-identity translation.  The key is either an exact host
- * executable path (/proc/<pid>/exe) or an exact argv token naming a Windows
- * image (the form exposed by Wine/Proton).  The value is the Windows-style
+ * Production process-identity translation. Native keys match the kernel's
+ * executable path (/proc/<pid>/exe), never process-controlled argv. The value
+ * is the Windows-style
  * image path ExitLag already associates with a configured application.
  *
  * A deliberately small, fixed table keeps this path allocation-free while
@@ -155,6 +156,7 @@ static FILE *g_log;
 struct identity_map_entry {
     char source[PATH_MAX];
     char target[512];
+    char owner_exe[PATH_MAX]; /* prefix mappings additionally bind a real executable */
 };
 static struct identity_map_entry g_identity_map[IDENTITY_MAP_MAX];
 static unsigned int g_identity_map_count;
@@ -226,25 +228,84 @@ static int udp_endpoint_has_remote(const struct udp_endpoint *endpoint,
 static const char *g_log_path;
 static long g_log_max_bytes = LOG_MAX_BYTES_DEFAULT;
 
+static int g_log_dir_fd = -1;
+static char g_log_name[NAME_MAX + 1];
+
+static FILE *private_log_open_at(int dir_fd, const char *name, int exclusive)
+{
+    int flags = O_WRONLY | O_APPEND | O_CREAT | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC;
+    if (exclusive) flags |= O_EXCL;
+    int fd = openat(dir_fd, name, flags, 0600);
+    if (fd < 0) return NULL;
+    struct stat st;
+    if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode) || st.st_nlink != 1 ||
+        st.st_uid != geteuid()) {
+        close(fd); errno = EPERM; return NULL;
+    }
+    if (fchmod(fd, 0600) != 0) { int error = errno; close(fd); errno = error; return NULL; }
+    FILE *file = fdopen(fd, "a");
+    if (!file) { int error = errno; close(fd); errno = error; }
+    return file;
+}
+
+/* Walk parent directories using anchored descriptors. No path component may
+   be a symlink; rotation retains the same directory even if it is renamed. */
+static FILE *private_log_open(const char *path)
+{
+    if (!path[0] || strlen(path) >= PATH_MAX) { errno = ENAMETOOLONG; return NULL; }
+    char copy[PATH_MAX];
+    snprintf(copy, sizeof(copy), "%s", path);
+    int directory = open(path[0] == '/' ? "/" : ".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (directory < 0) return NULL;
+    char *save = NULL;
+    char *part = strtok_r(copy, "/", &save);
+    while (part) {
+        char *next = strtok_r(NULL, "/", &save);
+        if (!strcmp(part, "..")) { close(directory); errno = EINVAL; return NULL; }
+        if (!next) {
+            if (!strcmp(part, ".") || strlen(part) > NAME_MAX - 2) {
+                close(directory); errno = EINVAL; return NULL;
+            }
+            FILE *file = private_log_open_at(directory, part, 0);
+            if (!file) { int error = errno; close(directory); errno = error; return NULL; }
+            g_log_dir_fd = directory;
+            snprintf(g_log_name, sizeof(g_log_name), "%s", part);
+            return file;
+        }
+        int child = openat(directory, part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        int error = errno;
+        close(directory);
+        if (child < 0) { errno = error; return NULL; }
+        directory = child;
+        part = next;
+    }
+    close(directory); errno = EINVAL; return NULL;
+}
+
 static void log_rotate_if_needed(void)
 {
-    if (!g_log || !g_log_path) return;
+    if (!g_log || !g_log_path || g_log_dir_fd < 0) return;
     static unsigned int since_check;
-    if (++since_check < 256) return;      /* ftell is cheap, but not free */
+    if (++since_check < 256) return;
     since_check = 0;
-    long size = ftell(g_log);
-    if (size < 0 || size < g_log_max_bytes) return;
-    char rotated[PATH_MAX];
-    snprintf(rotated, sizeof(rotated), "%s.1", g_log_path);
+    struct stat opened, named;
+    if (fstat(fileno(g_log), &opened) != 0 || opened.st_size < g_log_max_bytes) return;
+    /* Never rename a different object substituted at the log pathname. */
+    if (fstatat(g_log_dir_fd, g_log_name, &named, AT_SYMLINK_NOFOLLOW) != 0 ||
+        opened.st_dev != named.st_dev || opened.st_ino != named.st_ino) return;
+    char rotated[NAME_MAX + 3];
+    snprintf(rotated, sizeof(rotated), "%s.1", g_log_name);
     fflush(g_log);
-    fclose(g_log);
-    rename(g_log_path, rotated);          /* replaces any previous generation */
-    g_log = fopen(g_log_path, "a");
-    if (g_log) {
-        fprintf(g_log, "--- log rotated at %ld bytes; previous generation is %s ---\n",
-                size, rotated);
-        fflush(g_log);
+    if (renameat(g_log_dir_fd, g_log_name, g_log_dir_fd, rotated) != 0) return;
+    FILE *replacement = private_log_open_at(g_log_dir_fd, g_log_name, 1);
+    if (!replacement) {
+        /* Keep the already-open private inode; never follow a replacement. */
+        return;
     }
+    fclose(g_log);
+    g_log = replacement;
+    fprintf(g_log, "--- log rotated; previous private generation retained ---\n");
+    fflush(g_log);
 }
 
 static void log_line(const char *fmt, ...)
@@ -310,7 +371,7 @@ static unsigned long find_socket_inode_in(const char *path, int family,
     while (fgets(line, sizeof(line), f)) {
         char local[128], rem[128];
         unsigned long ino = 0;
-        int st = 0;
+        unsigned int st = 0;
         if (sscanf(line, "%*d: %127[0-9A-Fa-f:] %127[0-9A-Fa-f:] %X %*x:%*x %*x:%*x %*x %*d %*d %lu",
                    local, rem, &st, &ino) < 4)
             continue;
@@ -372,7 +433,7 @@ static unsigned long find_udp_socket_inode_in(const char *path, int family,
     while (fgets(line, sizeof(line), f)) {
         char local[128], rem[128];
         unsigned long inode = 0;
-        int st = 0;
+        unsigned int st = 0;
         if (sscanf(line, "%*d: %127[0-9A-Fa-f:] %127[0-9A-Fa-f:] %X %*x:%*x %*x:%*x %*x %*d %*d %lu",
                    local, rem, &st, &inode) < 4)
             continue;
@@ -544,35 +605,12 @@ static int pid_for_inode(unsigned long inode, char *exe_out, size_t exe_len)
 
 /* ------------------------------------------------------------------- ipc */
 
+/* Idle control messages use a fresh bounded deadline. RPC paths explicitly
+   share one deadline across request, nested traffic and matching response. */
 static int send_frame(int fd, unsigned short type, const void *payload, unsigned int len)
 {
-    struct exl_header head = { EXL_MAGIC, type, 0, len };
-    const unsigned char *parts[2] = { (const unsigned char *)&head, payload };
-    size_t lengths[2] = { sizeof(head), len };
-    for (int part = 0; part < 2; ++part) {
-        size_t sent = 0;
-        while (sent < lengths[part]) {
-            ssize_t n = write(fd, parts[part] + sent, lengths[part] - sent);
-            if (n < 0 && errno == EINTR) continue;
-            if (n <= 0) return -1;
-            sent += (size_t)n;
-        }
-    }
-    return 0;
-}
-
-static int read_exact(int fd, void *buf, size_t len, int timeout_ms)
-{
-    unsigned char *p = buf;
-    while (len) {
-        struct pollfd pfd = { fd, POLLIN, 0 };
-        int r = poll(&pfd, 1, timeout_ms);
-        if (r <= 0) return -1;
-        ssize_t n = read(fd, p, len);
-        if (n <= 0) return -1;
-        p += n; len -= (size_t)n;
-    }
-    return 0;
+    return exl_ipc_send_frame(fd, type, payload, len,
+                              exl_ipc_deadline_after(g_reply_timeout_ms));
 }
 
 /* Constant-time compare: no early exit that could leak a prefix match. */
@@ -699,7 +737,7 @@ static int load_identity_map(const char *map_path)
         return -1;
     }
 
-    char line[PATH_MAX + 768];
+    char line[2 * PATH_MAX + 768];
     unsigned int line_number = 0;
     while (fgets(line, sizeof(line), f)) {
         ++line_number;
@@ -714,25 +752,31 @@ static int load_identity_map(const char *map_path)
         if (!length || line[0] == '#') continue;
 
         char *tab = strchr(line, '\t');
-        if (!tab || tab == line || !tab[1] || strchr(tab + 1, '\t')) {
-            log_line("identity map: line %u must be SOURCE<TAB>WINDOWS_PATH", line_number);
+        if (!tab || tab == line || !tab[1]) {
+            log_line("identity map: line %u must be SOURCE<TAB>WINDOWS_PATH[<TAB>OWNER_EXE]", line_number);
             fclose(f);
             return -1;
         }
         *tab++ = 0;
+        char *owner = strchr(tab, '\t');
+        if (owner) *owner++ = 0;
+        if (!tab[0] || (owner && (!owner[0] || strchr(owner, '\t')))) {
+            log_line("identity map: line %u has empty or excess fields", line_number);
+            fclose(f);
+            return -1;
+        }
         if (g_identity_map_count == IDENTITY_MAP_MAX) {
             log_line("identity map: more than %u entries", IDENTITY_MAP_MAX);
             fclose(f);
             return -1;
         }
 
-        char canonical[PATH_MAX], prefixed[PATH_MAX + sizeof(IDENTITY_WINEPREFIX_TAG)];
+        char canonical[PATH_MAX], owner_canonical[PATH_MAX] = "";
+        char prefixed[PATH_MAX + sizeof(IDENTITY_WINEPREFIX_TAG)];
         const char *source = line;
         if (!strncmp(line, IDENTITY_WINEPREFIX_TAG, sizeof(IDENTITY_WINEPREFIX_TAG) - 1)) {
-            /* A Wine/Proton game's socket is owned by that prefix's wineserver,
-               whose /proc exe and argv are identical for every prefix on the
-               machine. The prefix path is the only thing that distinguishes
-               them, so it is matched against the owner's WINEPREFIX. */
+            /* Prefix hints are process-controlled. Require the user's exact
+               approved owner executable as well as the prefix, never argv. */
             const char *dir = line + sizeof(IDENTITY_WINEPREFIX_TAG) - 1;
             struct stat st;
             if (dir[0] != '/' || !realpath(dir, canonical) ||
@@ -744,16 +788,37 @@ static int load_identity_map(const char *map_path)
             }
             snprintf(prefixed, sizeof(prefixed), "%s%s", IDENTITY_WINEPREFIX_TAG, canonical);
             source = prefixed;
+            if (!owner) {
+                log_line("identity map: line %u prefix mapping requires OWNER_EXE third column; "
+                         "migrate to SOURCE<TAB>WINDOWS_PATH<TAB>/absolute/verified/runtime", line_number);
+                fclose(f);
+                return -1;
+            }
+            if (owner[0] != '/' || !realpath(owner, owner_canonical) ||
+                stat(owner_canonical, &st) != 0 || !S_ISREG(st.st_mode) ||
+                !(st.st_mode & 0111)) {
+                log_line("identity map: line %u OWNER_EXE must resolve to an existing executable file", line_number);
+                fclose(f);
+                return -1;
+            }
         } else if (line[0] == '/') {
-            if (!realpath(line, canonical)) {
-                log_line("identity map: line %u source does not resolve: %s", line_number, line);
+            struct stat st;
+            if (owner) {
+                log_line("identity map: line %u native mapping must have exactly two columns", line_number);
+                fclose(f);
+                return -1;
+            }
+            if (!realpath(line, canonical) || stat(canonical, &st) != 0 ||
+                !S_ISREG(st.st_mode) || !(st.st_mode & 0111)) {
+                log_line("identity map: line %u source does not resolve to an executable file: %s", line_number, line);
                 fclose(f);
                 return -1;
             }
             source = canonical;
-        } else if (!strstr(line, ".exe") && !strstr(line, ".EXE")) {
-            log_line("identity map: line %u source must be an absolute host path, an exact .exe argv "
-                     "token, or " IDENTITY_WINEPREFIX_TAG "<dir>", line_number);
+        } else {
+            log_line("identity map: line %u source must be an absolute host executable path or "
+                     IDENTITY_WINEPREFIX_TAG "<dir>; argv-only identities are unsafe and unsupported",
+                     line_number);
             fclose(f);
             return -1;
         }
@@ -765,7 +830,8 @@ static int load_identity_map(const char *map_path)
             return -1;
         }
         for (unsigned int i = 0; i < g_identity_map_count; ++i) {
-            if (!strcmp(g_identity_map[i].source, source)) {
+            if (!strcmp(g_identity_map[i].source, source) &&
+                !strcmp(g_identity_map[i].owner_exe, owner_canonical)) {
                 log_line("identity map: duplicate source on line %u: %s", line_number, source);
                 fclose(f);
                 return -1;
@@ -775,6 +841,7 @@ static int load_identity_map(const char *map_path)
         struct identity_map_entry *entry = &g_identity_map[g_identity_map_count++];
         snprintf(entry->source, sizeof(entry->source), "%s", source);
         snprintf(entry->target, sizeof(entry->target), "%s", tab);
+        snprintf(entry->owner_exe, sizeof(entry->owner_exe), "%s", owner_canonical);
     }
     if (ferror(f)) {
         log_line("identity map: read failed for %s", map_path);
@@ -786,19 +853,20 @@ static int load_identity_map(const char *map_path)
     log_line("identity map: loaded %u exact entries from %s (strict mode)",
              g_identity_map_count, map_path);
     for (unsigned int i = 0; i < g_identity_map_count; ++i)
-        log_line("identity map: %s -> %s", g_identity_map[i].source, g_identity_map[i].target);
+        log_line("identity map: %s -> %s owner=%s", g_identity_map[i].source, g_identity_map[i].target,
+                 g_identity_map[i].owner_exe[0] ? g_identity_map[i].owner_exe : "(native)");
     return 0;
 }
 
 /*
- * A Wine/Proton game does not hold its own socket: the fd belongs to that
- * prefix's wineserver, which reaches this code as the owning PID. Every
- * wineserver on the machine has the same /proc exe and argv, so the prefix it
- * serves -- taken from its WINEPREFIX environment -- is what identifies it.
- * Proton uses one prefix per title, which makes this exactly the right
- * granularity there.
+ * A Wine/Proton socket may also be held by its wineserver, which can reach this
+ * code as the owning PID. Runtime ownership must be observed, not inferred.
+ * The prefix is a useful configuration scope, not proof of a Windows image. The
+ * mapping must also name the exact owner executable observed through /proc.
+ * An approved loader can still launch any application in its prefix; this is
+ * intentionally a same-user, prefix-wide allowlist, not image attestation.
  */
-static const char *mapped_identity_for_wineprefix(unsigned int pid)
+static const char *mapped_identity_for_wineprefix(unsigned int pid, const char *owner_exe)
 {
     char path[64];
     snprintf(path, sizeof(path), "/proc/%u/environ", pid);
@@ -816,10 +884,15 @@ static const char *mapped_identity_for_wineprefix(unsigned int pid)
         size_t entry_length = strlen(entry);
         if (!strncmp(entry, key, sizeof(key) - 1)) {
             char canonical[PATH_MAX], tagged[PATH_MAX + sizeof(IDENTITY_WINEPREFIX_TAG)];
-            if (realpath(entry + sizeof(key) - 1, canonical)) {
+            const char *prefix = entry + sizeof(key) - 1;
+            /* A relative value would resolve against this helper's cwd, not
+               necessarily the socket owner's cwd, and is not reliable proof. */
+            if (prefix[0] == '/' && realpath(prefix, canonical)) {
                 snprintf(tagged, sizeof(tagged), "%s%s", IDENTITY_WINEPREFIX_TAG, canonical);
                 for (unsigned int i = 0; i < g_identity_map_count; ++i)
-                    if (!strcmp(tagged, g_identity_map[i].source)) return g_identity_map[i].target;
+                    if (!strcmp(tagged, g_identity_map[i].source) &&
+                        !strcmp(owner_exe, g_identity_map[i].owner_exe))
+                        return g_identity_map[i].target;
             }
             return NULL;   /* it has a prefix and none matched */
         }
@@ -833,91 +906,49 @@ static const char *mapped_identity_for_pid(unsigned int pid)
     char path[64], value[PATH_MAX];
     snprintf(path, sizeof(path), "/proc/%u/exe", pid);
     ssize_t n = readlink(path, value, sizeof(value) - 1);
-    if (n > 0) {
-        value[n] = 0;
-        for (unsigned int i = 0; i < g_identity_map_count; ++i)
-            if (!strcmp(value, g_identity_map[i].source)) return g_identity_map[i].target;
-    }
+    if (n <= 0 || n == (ssize_t)sizeof(value) - 1) return NULL;
+    value[n] = 0;
+    for (unsigned int i = 0; i < g_identity_map_count; ++i)
+        if (!g_identity_map[i].owner_exe[0] && !strcmp(value, g_identity_map[i].source))
+            return g_identity_map[i].target;
 
-    snprintf(path, sizeof(path), "/proc/%u/cmdline", pid);
-    FILE *f = fopen(path, "r");
-    if (!f) return NULL;
-    char command[4096];
-    n = (ssize_t)fread(command, 1, sizeof(command) - 1, f);
-    fclose(f);
-    command[n] = 0;
-    for (size_t at = 0; at < (size_t)n; ) {
-        const char *arg = command + at;
-        for (unsigned int i = 0; i < g_identity_map_count; ++i)
-            if (!strcmp(arg, g_identity_map[i].source)) return g_identity_map[i].target;
-        at += strlen(arg) + 1;
-    }
-
-    return mapped_identity_for_wineprefix(pid);
+    /* argv, including argv[0], is controlled by the process. Even an exact
+       configured native source appearing there is not executable identity. */
+    return mapped_identity_for_wineprefix(pid, value);
 }
 
 
-/*
- * Resolve a Linux PID to the executable path we can most honestly report.
- *
- * For a Wine process /proc/<pid>/exe points at the ELF loader, not the Windows
- * image, so the argv is searched for the actual *.exe. A trailing ".so" (Wine's
- * `Tibia.exe.so` form of the same binary) is dropped. Nothing is synthesised: if
- * no path can be read the answer is empty and the caller fails closed.
- */
+/* Resolve only explicit mappings or the kernel-reported executable. A
+ * Windows-looking argv token is never proof, including when no map is loaded.
+ * Wine/Proton image translation requires the user's verified map. */
 static int resolve_pid_path(unsigned int pid, char *out, size_t out_len)
 {
+    if (!out_len) return 0;
     out[0] = 0;
-    char path[64];
-
     if (g_identity_map_enabled) {
         const char *mapped = mapped_identity_for_pid(pid);
         if (mapped) {
-            snprintf(out, out_len, "%s", mapped);
+            if (strlen(mapped) >= out_len) return 0;
+            memcpy(out, mapped, strlen(mapped) + 1);
             return 2; /* explicit identity translation */
         }
-
-        /* Strict mode: an arbitrary native argv containing a .exe-looking
-           token must not impersonate a configured game.  Unmapped processes
-           retain their genuine host executable and therefore fail open. */
-        snprintf(path, sizeof(path), "/proc/%u/exe", pid);
-        ssize_t n = readlink(path, out, out_len - 1);
-        if (n > 0) { out[n] = 0; return 1; }
-        return 0;
     }
 
-    snprintf(path, sizeof(path), "/proc/%u/cmdline", pid);
-    FILE *f = fopen(path, "r");
-    if (f) {
-        char buf[4096];
-        size_t n = fread(buf, 1, sizeof(buf) - 1, f);
-        fclose(f);
-        buf[n] = 0;
-        for (size_t i = 0; i < n; ) {
-            const char *arg = buf + i;
-            size_t len = strlen(arg);
-            const char *dot = strstr(arg, ".exe");
-            if (dot && (dot[4] == 0 || !strcmp(dot, ".exe.so"))) {
-                snprintf(out, out_len, "%s", arg);
-                char *tail = strstr(out, ".exe.so");
-                if (tail) tail[4] = 0;          /* Tibia.exe.so -> Tibia.exe */
-                return 1;
-            }
-            i += len + 1;
-        }
-    }
-
+    char path[64];
     snprintf(path, sizeof(path), "/proc/%u/exe", pid);
     ssize_t n = readlink(path, out, out_len - 1);
-    if (n > 0) { out[n] = 0; return 1; }
-    out[0] = 0;
+    if (n > 0 && (size_t)n < out_len - 1) { out[n] = 0; return 1; }
+    out[0] = 0; /* no truncated or unverifiable identity */
     return 0;
 }
 
-static void serve_resolve_pid(const unsigned char *payload, unsigned int length)
+static void serve_resolve_pid(const unsigned char *payload, unsigned int length, exl_ipc_deadline deadline)
 {
-    if (length < sizeof(struct exl_resolve_pid_req)) return;
+    if (length != sizeof(struct exl_resolve_pid_req)) {
+        drop_shim("invalid resolve PID request size"); return;
+    }
     const struct exl_resolve_pid_req *req = (const struct exl_resolve_pid_req *)payload;
+    if (req->reserved) { drop_shim("invalid resolve PID reserved field"); return; }
     char exe[512];
     /* Only PIDs this helper actually reported may be resolved. Otherwise the
        lookup is a general-purpose "what is process N" oracle for anything on
@@ -925,7 +956,7 @@ static void serve_resolve_pid(const unsigned char *payload, unsigned int length)
     if (!g_allow_any_pid_resolve && !pid_was_observed(req->process_id)) {
         struct exl_resolve_pid_reply reply;
         reply.tag = req->tag; reply.path_length = 0; reply.reserved = 0;
-        send_frame(g_shim_fd, EXL_MSG_RESOLVE_PID_REPLY, &reply, sizeof(reply));
+        exl_ipc_send_frame(g_shim_fd, EXL_MSG_RESOLVE_PID_REPLY, &reply, sizeof(reply), deadline);
         log_line("resolve pid=%u REFUSED (not a pid this helper reported)", req->process_id);
         return;
     }
@@ -938,7 +969,7 @@ static void serve_resolve_pid(const unsigned char *payload, unsigned int length)
     reply->path_length = len;
     reply->reserved = 0;
     if (len) memcpy(frame + sizeof(*reply), exe, len);
-    send_frame(g_shim_fd, EXL_MSG_RESOLVE_PID_REPLY, frame, (unsigned int)(sizeof(*reply) + len));
+    exl_ipc_send_frame(g_shim_fd, EXL_MSG_RESOLVE_PID_REPLY, frame, (unsigned int)(sizeof(*reply) + len), deadline);
     log_line("resolve pid=%u identity=%s -> %s", req->process_id,
              resolution == 2 ? "translated" : resolution == 1 ? "genuine" : "unresolved",
              len ? exe : "(unresolved)");
@@ -946,25 +977,6 @@ static void serve_resolve_pid(const unsigned char *payload, unsigned int length)
 
 static const struct exl_udp_datagram_req *g_current_udp_req;
 static const unsigned char *g_current_udp_payload;
-
-static unsigned long long payload_hash(const unsigned char *data, unsigned int length)
-{
-    unsigned long long hash = 1469598103934665603ULL;
-    for (unsigned int i = 0; i < length; ++i) { hash ^= data[i]; hash *= 1099511628211ULL; }
-    return hash;
-}
-
-static void hex_head(char *out, size_t out_len, const unsigned char *data, unsigned int length)
-{
-    static const char digits[] = "0123456789abcdef";
-    unsigned int shown = length < 32 ? length : 32;
-    size_t at = 0;
-    for (unsigned int i = 0; i < shown && at + 2 < out_len; ++i) {
-        out[at++] = digits[data[i] >> 4]; out[at++] = digits[data[i] & 15];
-    }
-    if (length > shown && at + 3 < out_len) { out[at++] = '.'; out[at++] = '.'; out[at++] = '.'; }
-    out[at] = 0;
-}
 
 static void wire_endpoint(char *out, size_t out_len, const unsigned char address[28])
 {
@@ -987,9 +999,8 @@ static void handle_udp_post(const unsigned char *payload, unsigned int length)
         log_line("udp post: malformed lengths event_tag=%llu", post->event_tag); return;
     }
     const unsigned char *bytes = payload + sizeof(*post) + post->options_length;
-    char remote[96], head[72];
+    char remote[96];
     wire_endpoint(remote, sizeof(remote), post->remote_address);
-    hex_head(head, sizeof(head), bytes, post->payload_length);
     int same_event = g_current_udp_req && post->event_tag == g_current_udp_req->tag &&
                      post->endpoint_id == g_current_udp_req->endpoint_id;
     int same_remote = same_event &&
@@ -1013,10 +1024,10 @@ static void handle_udp_post(const unsigned char *payload, unsigned int length)
     }
     const char *name = post->api == EXL_UDP_API_POST_SEND ? "nf_udpPostSend" :
                        post->api == EXL_UDP_API_POST_RECEIVE ? "nf_udpPostReceive" : "unknown-post";
-    log_line("    %s event_tag=%llu id=0x%llx status=%d remote=%s len=%u hash=%016llx head=%s "
+    log_line("    %s event_tag=%llu id=0x%llx status=%d remote=%s len=%u metadata-only "
              "same_event=%d same_remote=%d same_payload=%d options={flags=0x%x,len=%u}",
              name, post->event_tag, post->endpoint_id, post->status, remote,
-             post->payload_length, payload_hash(bytes, post->payload_length), head,
+             post->payload_length,
              same_event, same_remote, same_payload, post->option_flags, post->options_length);
 }
 
@@ -1050,11 +1061,11 @@ static void handle_udp_state(const unsigned char *payload, unsigned int length)
                 rule_added = 1;
             }
         }
-        char ip[INET_ADDRSTRLEN] = "?", raw[48];
-        inet_ntop(AF_INET, &address, ip, sizeof(ip)); hex_head(raw, sizeof(raw), data, 20);
-        log_line("    %s event_tag=%llu id=0x%llx status=%d remote=%s:%u flags=0x%x raw20=%s state=%s unique=%u",
+        char ip[INET_ADDRSTRLEN] = "?";
+        inet_ntop(AF_INET, &address, ip, sizeof(ip));
+        log_line("    %s event_tag=%llu id=0x%llx status=%d remote=%s:%u flags=0x%x state=%s unique=%u",
                  name, state->event_tag, state->endpoint_id, state->status, ip,
-                 (unsigned)ntohs(port_net), (unsigned)flags, raw,
+                 (unsigned)ntohs(port_net), (unsigned)flags,
                  rule_added ? "added" : "existing-or-unusable",
                  endpoint ? endpoint->remote_rule_unique_count : 0);
     } else {
@@ -1066,74 +1077,64 @@ static void handle_udp_state(const unsigned char *payload, unsigned int length)
     }
 }
 
-static int handle_nested_message(const struct exl_header *head, const unsigned char *payload)
+static int handle_nested_message(const struct exl_header *head, const unsigned char *payload,
+                                 exl_ipc_deadline deadline)
 {
-    if (head->type == EXL_MSG_RESOLVE_PID_REQ) { serve_resolve_pid(payload, head->length); return 1; }
+    if (head->type == EXL_MSG_HELLO) {
+        drop_shim("unexpected second HELLO");
+        return -1;
+    }
+    if (head->type == EXL_MSG_RESOLVE_PID_REQ) {
+        serve_resolve_pid(payload, head->length, deadline);
+        return g_shim_fd >= 0 ? 1 : -1;
+    }
     if (head->type == EXL_MSG_UDP_POST) { handle_udp_post(payload, head->length); return 1; }
     if (head->type == EXL_MSG_UDP_STATE) { handle_udp_state(payload, head->length); return 1; }
     if (head->type == EXL_MSG_PONG && head->length == 0) return 1;
     return 0;
 }
 
-/* Ask the shim to run ExitLag's tcpConnectRequest. Returns 0 on a usable reply. */
-static int ask_shim_tcp_connect(struct exl_tcp_connect_req *req, struct exl_tcp_connect_reply *reply)
-{
-    if (g_shim_fd < 0) return -1;
-    if (send_frame(g_shim_fd, EXL_MSG_TCP_CONNECT_REQ, req, sizeof(*req)) != 0) {
-        drop_shim("write failed");
-        return -1;
-    }
-    for (;;) {
-        struct exl_header head;
-        if (read_exact(g_shim_fd, &head, sizeof(head), g_reply_timeout_ms) != 0) {
-            log_line("no reply from shim within %d ms; failing open", g_reply_timeout_ms);
-            return -1;
-        }
-        if (head.magic != EXL_MAGIC || head.length > EXL_MAX_PAYLOAD) { drop_shim("bad framing"); return -1; }
-        static unsigned char buf[EXL_MAX_PAYLOAD];
-        if (head.length && read_exact(g_shim_fd, buf, head.length, g_reply_timeout_ms) != 0) {
-            drop_shim("short payload");
-            return -1;
-        }
-        if (head.type == EXL_MSG_HELLO && head.length >= sizeof(struct exl_hello)) {
-            const struct exl_hello *hello = (const struct exl_hello *)buf;
-            g_shim_windows_pid = hello->shim_process_id;
-            struct exl_hello_ack ack = { EXL_PROTOCOL_VERSION, (unsigned int)getpid(), 0 };
-            send_frame(g_shim_fd, EXL_MSG_HELLO_ACK, &ack, sizeof(ack));
-            continue;
-        }
-        if (handle_nested_message(&head, buf)) continue;
-        if (head.type == EXL_MSG_TCP_CONNECT_REPLY && head.length >= sizeof(*reply)) {
-            memcpy(reply, buf, sizeof(*reply));
-            if (reply->tag != req->tag) continue;   /* stale reply, keep reading */
-            return 0;
-        }
-    }
-}
-
 static int wait_for_shim_reply(unsigned short expected_type, unsigned long long tag,
-                               void *reply, unsigned int reply_length)
+                               void *reply, unsigned int reply_length,
+                               exl_ipc_deadline deadline)
 {
     for (;;) {
         struct exl_header head;
-        if (read_exact(g_shim_fd, &head, sizeof(head), g_reply_timeout_ms) != 0) {
-            log_line("no UDP reply from shim within %d ms; failing open", g_reply_timeout_ms);
+        static unsigned char buf[EXL_MAX_PAYLOAD];
+        if (exl_ipc_recv_frame(g_shim_fd, &head, buf, sizeof(buf), deadline) != 0) {
+            log_line("shim reply failed or exceeded the %d ms RPC deadline; failing open",
+                     g_reply_timeout_ms);
+            /* A partial frame cannot be resumed as a new header. */
+            drop_shim("reply timeout, framing error or disconnect");
             return -1;
         }
-        if (head.magic != EXL_MAGIC || head.length > EXL_MAX_PAYLOAD) { drop_shim("bad framing"); return -1; }
-        static unsigned char buf[EXL_MAX_PAYLOAD];
-        if (head.length && read_exact(g_shim_fd, buf, head.length, g_reply_timeout_ms) != 0) {
-            drop_shim("short payload"); return -1;
-        }
-        if (handle_nested_message(&head, buf)) continue;
-        if (head.type == expected_type && head.length >= reply_length) {
+        int nested = handle_nested_message(&head, buf, deadline);
+        if (nested < 0) return -1;
+        if (nested) continue;
+        if (head.type == expected_type) {
+            if (head.length != reply_length) {
+                drop_shim("invalid fixed-size RPC reply"); return -1;
+            }
             unsigned long long reply_tag;
             memcpy(&reply_tag, buf, sizeof(reply_tag));
             if (reply_tag != tag) continue;
             memcpy(reply, buf, reply_length);
             return 0;
         }
+        /* Unknown or stale messages do not extend the operation deadline. */
     }
+}
+
+/* Ask the real shim callback provider; synthetic tests identify themselves. */
+static int ask_shim_tcp_connect(struct exl_tcp_connect_req *req, struct exl_tcp_connect_reply *reply)
+{
+    exl_ipc_deadline deadline = exl_ipc_deadline_after(g_reply_timeout_ms);
+    if (g_shim_fd < 0) return -1;
+    if (exl_ipc_send_frame(g_shim_fd, EXL_MSG_TCP_CONNECT_REQ, req, sizeof(*req), deadline) != 0) {
+        drop_shim("request write failed or timed out");
+        return -1;
+    }
+    return wait_for_shim_reply(EXL_MSG_TCP_CONNECT_REPLY, req->tag, reply, sizeof(*reply), deadline);
 }
 
 static int ask_shim_udp_lifecycle(struct exl_udp_lifecycle_req *req, int created,
@@ -1141,26 +1142,38 @@ static int ask_shim_udp_lifecycle(struct exl_udp_lifecycle_req *req, int created
 {
     unsigned short request_type = created ? EXL_MSG_UDP_CREATED_REQ : EXL_MSG_UDP_CLOSED_REQ;
     unsigned short reply_type = created ? EXL_MSG_UDP_CREATED_REPLY : EXL_MSG_UDP_CLOSED_REPLY;
-    if (g_shim_fd < 0 || send_frame(g_shim_fd, request_type, req, sizeof(*req)) != 0) return -1;
-    return wait_for_shim_reply(reply_type, req->tag, reply, sizeof(*reply));
+    exl_ipc_deadline deadline = exl_ipc_deadline_after(g_reply_timeout_ms);
+    if (g_shim_fd < 0) return -1;
+    if (exl_ipc_send_frame(g_shim_fd, request_type, req, sizeof(*req), deadline) != 0) {
+        drop_shim("UDP lifecycle write failed or timed out"); return -1;
+    }
+    return wait_for_shim_reply(reply_type, req->tag, reply, sizeof(*reply), deadline);
 }
 
 static int ask_shim_udp_connect(struct exl_udp_connect_req *req,
                                 struct exl_udp_connect_reply *reply)
 {
-    if (g_shim_fd < 0 || send_frame(g_shim_fd, EXL_MSG_UDP_CONNECT_REQ, req, sizeof(*req)) != 0) return -1;
-    return wait_for_shim_reply(EXL_MSG_UDP_CONNECT_REPLY, req->tag, reply, sizeof(*reply));
+    exl_ipc_deadline deadline = exl_ipc_deadline_after(g_reply_timeout_ms);
+    if (g_shim_fd < 0) return -1;
+    if (exl_ipc_send_frame(g_shim_fd, EXL_MSG_UDP_CONNECT_REQ, req, sizeof(*req), deadline) != 0) {
+        drop_shim("UDP connect write failed or timed out"); return -1;
+    }
+    return wait_for_shim_reply(EXL_MSG_UDP_CONNECT_REPLY, req->tag, reply, sizeof(*reply), deadline);
 }
 
 static int ask_shim_udp_datagram(unsigned char *frame, unsigned int frame_length,
                                  struct exl_udp_datagram_reply *reply)
 {
     struct exl_udp_datagram_req *req = (struct exl_udp_datagram_req *)frame;
-    if (g_shim_fd < 0 || send_frame(g_shim_fd, EXL_MSG_UDP_DATAGRAM_REQ, frame, frame_length) != 0) return -1;
+    exl_ipc_deadline deadline = exl_ipc_deadline_after(g_reply_timeout_ms);
+    if (g_shim_fd < 0) return -1;
+    if (exl_ipc_send_frame(g_shim_fd, EXL_MSG_UDP_DATAGRAM_REQ, frame, frame_length, deadline) != 0) {
+        drop_shim("UDP datagram write failed or timed out"); return -1;
+    }
     g_current_udp_req = req;
     g_current_udp_payload = frame + sizeof(*req) + req->options_length;
     memset(&g_udp_post, 0, sizeof(g_udp_post));
-    int result = wait_for_shim_reply(EXL_MSG_UDP_DATAGRAM_REPLY, req->tag, reply, sizeof(*reply));
+    int result = wait_for_shim_reply(EXL_MSG_UDP_DATAGRAM_REPLY, req->tag, reply, sizeof(*reply), deadline);
     g_current_udp_req = NULL; g_current_udp_payload = NULL;
     return result;
 }
@@ -1192,67 +1205,44 @@ static void accept_shim(void)
         return;
     }
 
-    if (g_shim_fd >= 0) {
-        log_line("replacing existing shim connection (new peer uid=%u)", (unsigned)peer_uid);
-        close(g_shim_fd);
-    }
-    log_line("shim peer uid=%u accepted", (unsigned)peer_uid);
-    g_shim_fd = fd;
+    /* A rejected candidate must not evict an authenticated active session.
+       The entire header/body/ACK exchange shares one monotonic deadline. */
     int one = 1;
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
-    log_line("shim connected");
-
-    /*
-     * The handshake must complete, and prove knowledge of this session's token,
-     * before anything else is served. A peer that fails here is disconnected
-     * without ever reaching a routing code path.
-     */
+    exl_ipc_deadline deadline = exl_ipc_deadline_after(2000);
     struct exl_header head;
-    if (read_exact(fd, &head, sizeof(head), 2000) != 0 || head.magic != EXL_MAGIC ||
-        head.type != EXL_MSG_HELLO || head.length > EXL_MAX_PAYLOAD) {
-        log_line("REFUSED shim connection: no valid HELLO");
-        drop_shim("handshake missing or malformed");
+    static unsigned char body[EXL_MAX_PAYLOAD];
+    if (exl_ipc_recv_frame(fd, &head, body, sizeof(body), deadline) != 0 ||
+        head.type != EXL_MSG_HELLO || head.length != sizeof(struct exl_hello)) {
+        log_line("REFUSED shim connection: no valid complete HELLO within deadline");
+        close(fd);
         return;
     }
     struct exl_hello hello;
-    memset(&hello, 0, sizeof(hello));
-    if (head.length < sizeof(hello)) {
-        log_line("REFUSED shim connection: HELLO is %u bytes, expected %zu "
-                 "(an unauthenticated or outdated client)",
-                 head.length, sizeof(hello));
-        drop_shim("short handshake");
-        return;
-    }
-    if (read_exact(fd, &hello, sizeof(hello), 2000) != 0) {
-        log_line("REFUSED shim connection: HELLO body not received");
-        drop_shim("handshake truncated");
-        return;
-    }
-    /* Drain any bytes beyond the struct so framing stays aligned. */
-    for (unsigned int extra = head.length - (unsigned int)sizeof(hello); extra; ) {
-        unsigned char scratch[256];
-        unsigned int chunk = extra > sizeof(scratch) ? (unsigned int)sizeof(scratch) : extra;
-        if (read_exact(fd, scratch, chunk, 2000) != 0) { drop_shim("handshake truncated"); return; }
-        extra -= chunk;
-    }
-
+    memcpy(&hello, body, sizeof(hello));
     if (hello.version != EXL_PROTOCOL_VERSION) {
-        log_line("hello: shim protocol=%u (expected %u)", hello.version, EXL_PROTOCOL_VERSION);
-        drop_shim("protocol version mismatch");
+        log_line("REFUSED shim connection: version mismatch: protocol=%u (expected %u)",
+                 hello.version, EXL_PROTOCOL_VERSION);
+        close(fd);
         return;
     }
     if (!token_equal(hello.token, g_session_token)) {
-        /* Never log either token, not even a prefix. */
-        log_line("REFUSED shim connection from uid=%u: session token mismatch. "
-                 "Only the process given this session's token may drive the backend.",
+        log_line("REFUSED shim connection from uid=%u: session token mismatch",
                  (unsigned)peer_uid);
-        drop_shim("bad session token");
+        close(fd);
         return;
     }
-
-    g_shim_windows_pid = hello.shim_process_id;
     struct exl_hello_ack ack = { EXL_PROTOCOL_VERSION, (unsigned int)getpid(), 0 };
-    send_frame(fd, EXL_MSG_HELLO_ACK, &ack, sizeof(ack));
+    if (exl_ipc_send_frame(fd, EXL_MSG_HELLO_ACK, &ack, sizeof(ack), deadline) != 0) {
+        close(fd);
+        return;
+    }
+    if (g_shim_fd >= 0) {
+        log_line("replacing existing shim connection (authenticated peer uid=%u)", (unsigned)peer_uid);
+        close(g_shim_fd);
+    }
+    g_shim_fd = fd;
+    g_shim_windows_pid = hello.shim_process_id;
     g_shim_authenticated = 1;
     log_line("hello: shim protocol=%u exitlag_windows_pid=%u (token accepted)",
              hello.version, hello.shim_process_id);
@@ -1579,10 +1569,9 @@ static void observe_udp_packet(int queue_num, unsigned int packet_id, int family
     struct exl_udp_datagram_reply reply;
     memset(&reply, 0, sizeof(reply));
     int have_reply = ask_shim_udp_datagram(frame, frame_length, &reply) == 0;
-    char local[96], remote[96], head[72];
+    char local[96], remote[96];
     wire_endpoint(local, sizeof(local), endpoint->local_address);
     wire_endpoint(remote, sizeof(remote), remote_address);
-    hex_head(head, sizeof(head), datagram, payload_length);
     unsigned int packet_verdict = NF_ACCEPT;
     const char *decision = "ACCEPT unchanged (UDP observe)";
     if (g_apply_udp && have_reply) {
@@ -1626,21 +1615,21 @@ static void observe_udp_packet(int queue_num, unsigned int packet_id, int family
     }
     if (have_reply) {
         log_line("udp %s tag=%llu id=0x%llx packet=%llu linux=%s -> %s linux_pid=%d exe=%s "
-                 "effective_pid=%u len=%u hash=%016llx head=%s callback={posts=%u,rules=%u,controls=%u,"
+                 "effective_pid=%u len=%u metadata-only callback={posts=%u,rules=%u,controls=%u,"
                  "direct_remote=%u,direct_payload=%u,direct_options=%u} flowctl=%u | %s",
                  direction == EXL_DIR_OUT ? "udpSend" : "udpReceive", req->tag, endpoint->id,
                  direction == EXL_DIR_OUT ? endpoint->datagrams_out : endpoint->datagrams_in,
                  local, remote, endpoint->linux_pid, endpoint->exe[0] ? endpoint->exe : "?",
-                 endpoint->effective_pid, payload_length, payload_hash(datagram, payload_length), head,
+                 endpoint->effective_pid, payload_length,
                  reply.post_count, reply.remote_rule_count, reply.control_count,
                  reply.mutated_remote, reply.mutated_payload, reply.mutated_options,
                  endpoint->flowctl_handle, decision);
     } else {
         log_line("udp %s tag=%llu id=0x%llx linux=%s -> %s pid=%d exe=%s len=%u "
-                 "hash=%016llx | no shim reply; ACCEPT unchanged (UDP fail-open)",
+                 "metadata-only | no shim reply; ACCEPT unchanged (UDP fail-open)",
                  direction == EXL_DIR_OUT ? "udpSend" : "udpReceive", req->tag, endpoint->id,
                  local, remote, endpoint->linux_pid, endpoint->exe[0] ? endpoint->exe : "?",
-                 payload_length, payload_hash(datagram, payload_length));
+                 payload_length);
     }
     send_verdict(queue_num, packet_id, packet_verdict);
 }
@@ -1655,7 +1644,7 @@ static void observe_udp_packet(int queue_num, unsigned int packet_id, int family
  * retains the translation for all later packets and no persistent map entry is
  * needed.
  *
- * /usr/bin/nft is invoked directly (never through a shell), and every token in
+ * A trusted absolute nft path is invoked directly (never through a shell), and every token in
  * the command is produced by inet_ntop or an integer conversion. A failed map
  * update is a fail-open condition: the caller accepts the original SYN.
  */
@@ -1692,7 +1681,14 @@ static int nft_arm_tcp_redirect(int family, const void *src, unsigned short spor
     if (child == 0) {
         if (dup2(input[0], STDIN_FILENO) < 0) _exit(126);
         close(input[0]); close(input[1]);
+        /* The compile-time override is for packaged/isolated test builds.
+           Never search a root helper's caller-controlled PATH. */
+#ifdef EXL_NFT_PATH
+        execl(EXL_NFT_PATH, "nft", "-f", "-", (char *)NULL);
+#else
+        execl("/usr/sbin/nft", "nft", "-f", "-", (char *)NULL);
         execl("/usr/bin/nft", "nft", "-f", "-", (char *)NULL);
+#endif
         _exit(127);
     }
 
@@ -2028,7 +2024,15 @@ int main(int argc, char **argv)
         if (!strcmp(argv[i], "--queue") && i + 1 < argc) g_queue_num = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--port") && i + 1 < argc) port = (unsigned short)atoi(argv[++i]);
         else if (!strcmp(argv[i], "--log") && i + 1 < argc) logpath = argv[++i];
-        else if (!strcmp(argv[i], "--timeout-ms") && i + 1 < argc) g_reply_timeout_ms = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--timeout-ms") && i + 1 < argc) {
+            char *end = NULL;
+            errno = 0;
+            long value = strtol(argv[++i], &end, 10);
+            if (errno || !argv[i][0] || !end || *end || value < 1 || value > 60000) {
+                fprintf(stderr, "--timeout-ms must be an integer in 1..60000\n"); return 2;
+            }
+            g_reply_timeout_ms = (int)value;
+        }
         else if (!strcmp(argv[i], "--no-queue")) g_no_queue = 1;
         else if (!strcmp(argv[i], "--peer-uid") && i + 1 < argc) g_allowed_peer_uid = (uid_t)atoi(argv[++i]);
         else if (!strcmp(argv[i], "--token-file") && i + 1 < argc) snprintf(g_token_path, sizeof(g_token_path), "%s", argv[++i]);
@@ -2068,7 +2072,7 @@ int main(int argc, char **argv)
             "  --udp-active-index select the Nth eligible endpoint (1-based; default 1)\n"
             "  --udp-queue  NFQUEUE for both UDP directions (default: TCP queue + 1)\n"
             "  --udp-exe    accept queued UDP unchanged unless owner path contains TEXT\n"
-            "  --identity-map exact SOURCE<TAB>WINDOWS_PATH translations; enables strict identity mode\n"
+            "  --identity-map native SOURCE<TAB>WINDOWS_PATH; prefix rows require <TAB>OWNER_EXE\n"
             "  --self-test  once the shim connects, synthesize one flow event to this\n"
             "               destination and report what ExitLag did with it\n", argv[0]); return 2; }
     }
@@ -2077,7 +2081,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "TCP and UDP queue numbers must differ\n"); return 2;
     }
     if (logpath) {
-        g_log = fopen(logpath, "a");
+        g_log = private_log_open(logpath);
         if (!g_log) { perror("log"); return 1; }
         g_log_path = logpath;
         /* Overridable so rotation is testable without generating 8 MB. */
@@ -2129,9 +2133,9 @@ int main(int argc, char **argv)
     atexit(token_remove);
     /*
      * A runner that forgets to pass --identity-map does not fail; it silently
-     * runs without strict mode, so unmapped processes keep the spoofable argv
-     * scan and nothing is translated. That is a security-relevant downgrade
-     * with no visible symptom, and it has happened once already. If the
+     * runs without strict mode, so no identities are translated and Wine/Proton
+     * processes retain only their kernel-reported host executable. This can
+     * silently break intended routing. If the
      * environment asked for a map, refuse to run without it.
      */
     if (!identity_map_path) {
@@ -2229,6 +2233,7 @@ int main(int argc, char **argv)
         int listen_index = n;
         pfds[n].fd = g_listen_fd; pfds[n].events = POLLIN; pfds[n].revents = 0; n++;
         int shim_index = -1;
+        int polled_shim_fd = g_shim_fd;
         if (g_shim_fd >= 0) { shim_index = n; pfds[n].fd = g_shim_fd; pfds[n].events = POLLIN; pfds[n].revents = 0; n++; }
 
         int r = poll(pfds, (nfds_t)n, 1000);
@@ -2246,25 +2251,22 @@ int main(int argc, char **argv)
                 log_line("cb_run: %s", strerror(errno));
         }
         if (pfds[listen_index].revents & POLLIN) {
+            int previous_shim_fd = g_shim_fd;
             accept_shim();
-            if (g_selftest && g_shim_fd >= 0) run_self_test(g_selftest);
+            if (g_selftest && g_shim_fd >= 0 && g_shim_fd != previous_shim_fd)
+                run_self_test(g_selftest);
         }
-        if (shim_index >= 0 && (pfds[shim_index].revents & (POLLIN | POLLHUP | POLLERR))) {
-            /* unsolicited data or EOF from the shim */
+        if (shim_index >= 0 && g_shim_fd == polled_shim_fd &&
+            (pfds[shim_index].revents & (POLLIN | POLLHUP | POLLERR))) {
+            /* The poll event belongs to the descriptor captured before accept;
+               it must never be applied to a newly authenticated replacement. */
             struct exl_header head;
-            if (read_exact(g_shim_fd, &head, sizeof(head), 0) != 0) drop_shim("eof");
-            else if (head.magic != EXL_MAGIC || head.length > EXL_MAX_PAYLOAD) drop_shim("bad framing");
-            else {
-                static unsigned char tmp[EXL_MAX_PAYLOAD];
-                if (head.length && read_exact(g_shim_fd, tmp, head.length, 200) != 0) drop_shim("short payload");
-                else if (head.type == EXL_MSG_HELLO && head.length >= sizeof(struct exl_hello)) {
-                    const struct exl_hello *hello = (const struct exl_hello *)tmp;
-                    g_shim_windows_pid = hello->shim_process_id;
-                    struct exl_hello_ack ack = { EXL_PROTOCOL_VERSION, (unsigned int)getpid(), 0 };
-                    send_frame(g_shim_fd, EXL_MSG_HELLO_ACK, &ack, sizeof(ack));
-                    log_line("hello: shim protocol=%u exitlag_windows_pid=%u", hello->version, hello->shim_process_id);
-                } else handle_nested_message(&head, tmp);
-            }
+            static unsigned char tmp[EXL_MAX_PAYLOAD];
+            exl_ipc_deadline deadline = exl_ipc_deadline_after(200);
+            if (exl_ipc_recv_frame(g_shim_fd, &head, tmp, sizeof(tmp), deadline) != 0)
+                drop_shim("unsolicited frame timeout, framing error or eof");
+            else
+                handle_nested_message(&head, tmp, deadline);
         }
         if (g_shim_fd >= 0) {
             struct timespec heartbeat_now;
@@ -2289,5 +2291,7 @@ int main(int argc, char **argv)
     }
     if (g_shim_fd >= 0) close(g_shim_fd);
     if (g_listen_fd >= 0) close(g_listen_fd);
+    if (g_log) fclose(g_log);
+    if (g_log_dir_fd >= 0) close(g_log_dir_fd);
     return 0;
 }

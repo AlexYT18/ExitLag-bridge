@@ -16,10 +16,10 @@ class WineSocketAdapter:
     def load(cls, path, uid, identities, expected_port=51902):
         if uid is None or uid < 500:
             raise ValueError("A companion must belong to the game user")
-        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
         with os.fdopen(fd, "rb") as source:
             info = os.fstat(source.fileno())
-            if (not stat.S_ISREG(info.st_mode) or info.st_uid != uid
+            if (not stat.S_ISREG(info.st_mode) or info.st_uid != uid or info.st_nlink != 1
                     or info.st_mode & 0o077 or info.st_size > 4096):
                 raise ValueError("Companion configuration must be private and owned by the game user")
             config = json.loads(source.read(4097))

@@ -31,15 +31,36 @@ def read_map(path, uid):
     finally:
         os.close(fd)
     count = 0
+    identities = set()
     for line in data.splitlines():
         if not line.strip() or line.lstrip().startswith('#'):
             continue
         parts = line.split('\t')
-        if len(parts) != 2 or not parts[1].lower().endswith('.exe') or any(c in line for c in '\0\r'):
+        prefix = parts[0].startswith('wineprefix:')
+        if prefix and len(parts) == 2:
+            raise ValueError('Wine-prefix mappings require an OWNER_EXE third column; configure the actual Wine/Proton loader')
+        if (len(parts) != (3 if prefix else 2) or not parts[1].lower().endswith('.exe')
+                or any(c in line for c in '\0\r') or len(line) > 4096):
             raise ValueError('Invalid game mapping')
         source = parts[0].removeprefix('wineprefix:')
-        if not source.startswith('/') or len(line) > 4096:
+        if not source.startswith('/'):
             raise ValueError('Mappings require absolute game paths')
+        source_path = Path(source).resolve(strict=True)
+        if prefix:
+            if not source_path.is_dir() or not parts[2].startswith('/'):
+                raise ValueError('A Wine-prefix mapping requires a prefix directory and an absolute loader executable')
+            owner = Path(parts[2]).resolve(strict=True)
+            executable = owner
+        else:
+            owner = None
+            executable = source_path
+        info = executable.stat()
+        if not stat.S_ISREG(info.st_mode) or not info.st_mode & 0o111:
+            raise ValueError('Map the actual regular executable that owns the game connection')
+        key = (source_path, owner)
+        if key in identities:
+            raise ValueError('Duplicate game mapping')
+        identities.add(key)
         count += 1
     if not count or count > 128:
         raise ValueError('Configure between 1 and 128 games before enabling routing')
@@ -51,9 +72,12 @@ def lease_alive(path, uid):
         fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
         try:
             info = os.fstat(fd)
+            # Future timestamps (including a backwards wall-clock jump) must
+            # not extend an unresponsive launcher's authorization lease.
+            age = time.time() - info.st_mtime
             return (stat.S_ISREG(info.st_mode) and info.st_uid == uid and info.st_nlink == 1
                     and not info.st_mode & 0o077 and info.st_size < 64
-                    and time.time() - info.st_mtime < 6 and os.read(fd, 64) == b'run\n')
+                    and 0 <= age < 6 and os.read(fd, 64) == b'run\n')
         finally:
             os.close(fd)
     except OSError:
