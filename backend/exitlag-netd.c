@@ -49,6 +49,8 @@
 
 #include "protocol.h"
 #include "ipc_transport.h"
+#include "tcp_attribution.h"
+#include "process_identity.h"
 
 /*
  * Wine hands the socket fd to the application only after wineserver has created
@@ -332,73 +334,8 @@ static void on_signal(int sig) { (void)sig; g_stop = 1; }
 
 /* ---------------------------------------------------------------- process */
 
-/*
- * Attribute a local endpoint to a PID: find the socket inode in /proc/net/tcp*
- * for the exact local address:port, then find which process holds that inode.
- * Best effort by design -- an unattributed flow is still reported, with pid 0.
- */
-static unsigned long find_socket_inode_in(const char *path, int hex_family,
-                                          const unsigned char *local_ip, unsigned short local_port);
-
-/*
- * Attribute an IPv4 flow whose socket is dual-stack. A process that opens an
- * AF_INET6 socket without IPV6_V6ONLY -- which is the default for Java, and
- * common elsewhere -- carries IPv4 traffic on a socket the kernel lists in
- * /proc/net/tcp6 as ::ffff:a.b.c.d. Looking only in /proc/net/tcp therefore
- * finds nothing and the flow is reported unattributed, which is what happened
- * to Minecraft.
- */
-static unsigned long find_socket_inode(int family, const unsigned char *local_ip, unsigned short local_port)
-{
-    if (family == AF_INET) {
-        unsigned long inode = find_socket_inode_in("/proc/net/tcp", AF_INET, local_ip, local_port);
-        if (inode) return inode;
-        unsigned char mapped[16] = { 0,0,0,0, 0,0,0,0, 0,0,0xff,0xff, 0,0,0,0 };
-        memcpy(mapped + 12, local_ip, 4);
-        return find_socket_inode_in("/proc/net/tcp6", AF_INET6, mapped, local_port);
-    }
-    return find_socket_inode_in("/proc/net/tcp6", AF_INET6, local_ip, local_port);
-}
-
-static unsigned long find_socket_inode_in(const char *path, int family,
-                                          const unsigned char *local_ip, unsigned short local_port)
-{
-    FILE *f = fopen(path, "r");
-    if (!f) return 0;
-    char line[512];
-    unsigned long inode = 0;
-    if (!fgets(line, sizeof(line), f)) { fclose(f); return 0; }  /* header */
-    while (fgets(line, sizeof(line), f)) {
-        char local[128], rem[128];
-        unsigned long ino = 0;
-        unsigned int st = 0;
-        if (sscanf(line, "%*d: %127[0-9A-Fa-f:] %127[0-9A-Fa-f:] %X %*x:%*x %*x:%*x %*x %*d %*d %lu",
-                   local, rem, &st, &ino) < 4)
-            continue;
-        char *colon = strrchr(local, ':');
-        if (!colon) continue;
-        *colon = 0;
-        unsigned int port = (unsigned int)strtoul(colon + 1, NULL, 16);
-        if (port != local_port) continue;
-
-        unsigned char addr[16];
-        size_t hexlen = strlen(local);
-        if (hexlen != (family == AF_INET ? 8u : 32u)) continue;
-        for (size_t i = 0; i < hexlen / 2; ++i) {
-            char byte[3] = { local[i * 2], local[i * 2 + 1], 0 };
-            addr[i] = (unsigned char)strtoul(byte, NULL, 16);
-        }
-        /* /proc prints each 32-bit word little-endian */
-        int match = 1;
-        for (size_t w = 0; w < hexlen / 8; ++w)
-            for (int b = 0; b < 4; ++b)
-                if (addr[w * 4 + b] != local_ip[w * 4 + (3 - b)]) { match = 0; break; }
-        if (match) { inode = ino; break; }
-    }
-    fclose(f);
-    return inode;
-}
-
+/* TCP attribution compares both endpoints and rejects ambiguous or malformed
+ * /proc socket tables. An unattributed flow is still reported with PID 0. */
 /* UDP sockets are commonly bound to ANY, while packets carry the interface
    address selected by the route. Prefer an exact local-address match and fall
    back to an all-zero bind on the same port. */
@@ -1788,11 +1725,17 @@ static int on_packet(const struct nlmsghdr *nlh, void *data)
     char exe[256] = "";
     int linux_pid = 0;
     int wait_ms = 0;
+    enum tcp_attribution_result attribution = TCP_ATTR_NONE;
     {
         struct timespec t0, t1;
         clock_gettime(CLOCK_MONOTONIC, &t0);
         for (int attempt = 0; attempt < ATTR_MAX_ATTEMPTS; ++attempt) {
-            if (!inode) inode = find_socket_inode(family, local_ip, ntohs(tcp->source));
+            if (!inode) {
+                attribution = tcp_attribution_lookup(family, local_ip, ntohs(tcp->source),
+                                                       dst, ntohs(tcp->dest), &inode);
+                if (attribution == TCP_ATTR_INVALID || attribution == TCP_ATTR_AMBIGUOUS)
+                    break;
+            }
             if (inode) {
                 linux_pid = pid_for_inode(inode, exe, sizeof(exe));
                 if (linux_pid && !pid_is_wine_plumbing_num(linux_pid)) break;
@@ -1807,6 +1750,17 @@ static int on_packet(const struct nlmsghdr *nlh, void *data)
     char from[96], to[96];
     format_endpoint(from, sizeof(from), family, src, tcp->source);
     format_endpoint(to, sizeof(to), family, dst, tcp->dest);
+
+    struct process_identity owner = {0};
+    if (attribution != TCP_ATTR_FOUND || !linux_pid ||
+        !process_identity_read((pid_t)linux_pid, &owner) ||
+        owner.uid != g_allowed_peer_uid || !process_identity_holds_socket(&owner, inode)) {
+        log_line("tcp syn %s -> %s attribution=%d pid=%d inode=%lu | "
+                 "unverified socket owner; callback skipped; ACCEPT (no new redirect)",
+                 from, to, (int)attribution, linux_pid, inode);
+        send_verdict(queue_num, packet_id, NF_ACCEPT);
+        return MNL_CB_OK;
+    }
 
     struct exl_tcp_connect_req req;
     memset(&req, 0, sizeof(req));
@@ -1898,12 +1852,21 @@ static int on_packet(const struct nlmsghdr *nlh, void *data)
                                    "(refused: the proven runtime only redirects to ExitLag's local proxy; "
                                    "--allow-remote-redirect overrides)";
             else {
-                redirect_requested = 1;
-                if (nft_arm_tcp_redirect(family, src, tcp->source, dst, tcp->dest,
+                unsigned long current_inode = 0;
+                enum tcp_attribution_result current_attribution =
+                    tcp_attribution_lookup(family, local_ip, ntohs(tcp->source),
+                                           dst, ntohs(tcp->dest), &current_inode);
+                if (current_attribution != TCP_ATTR_FOUND || current_inode != inode ||
+                    !process_identity_holds_socket(&owner, inode)) {
+                    redirect_failure = "socket owner exited, changed or released the flow during callback";
+                } else {
+                    redirect_requested = 1;
+                    if (nft_arm_tcp_redirect(family, src, tcp->source, dst, tcp->dest,
                                          new_addr, new_port_net) == 0)
-                    redirect_armed = 1;
-                else
-                    redirect_failure = "nft map update failed";
+                        redirect_armed = 1;
+                    else
+                        redirect_failure = "nft map update failed";
+                }
             }
         }
 
@@ -1918,7 +1881,7 @@ static int on_packet(const struct nlmsghdr *nlh, void *data)
                  (g_apply_tcp ? "ACCEPT unchanged (fail-open/no redirect)" : "ACCEPT unchanged (passive)"));
         if (redirect_failure)
             log_line("    redirect not armed: %s%s", redirect_failure,
-                     redirect_requested ? "; original destination retained" : "");
+                     redirect_requested ? "; no successful new redirect acknowledged" : "");
         if (g_last_candidates[0]) log_line("    holders: %s", g_last_candidates);
     } else {
         log_line("flow=%llu dt_ms=%lld tcp syn %s -> %s dport=%u pid=%d exe=%s | no shim reply | ACCEPT unchanged (fail-open)",

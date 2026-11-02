@@ -104,7 +104,7 @@ while True:
     ip_family = struct.unpack("<H", body[28:30])[0]
     remote = bytearray(body[58:86])                    # remote_address[28]
     fam = struct.unpack("<H", bytes(remote[0:2]))[0]   # sockaddr family, little-endian
-    log.write("req tag=%d ip_family=%d sockaddr_family=%d\n" % (tag, ip_family, fam))
+    log.write("req tag=%d ip_family=%d sockaddr_family=%d pid=%d\n" % (tag, ip_family, fam, pid))
     if fam == 23:                                      # Windows AF_INET6
         remote[2:4]  = struct.pack(">H", lport)
         if mode == "valid":         remote[8:24] = b"\x00"*15 + b"\x01"        # ::1
@@ -141,9 +141,10 @@ nft list chain inet exitlag output_nat 2>/dev/null | grep -q 'tcp_redirect_v6' \
 
 echo; echo "=== real IPv6 connection through the production path ==="
 python3 - "$dest" "$dest_port" "$work/client.log" <<'PY'
-import socket, sys
+import os, socket, sys
 s=socket.socket(socket.AF_INET6, socket.SOCK_STREAM); s.settimeout(8)
 log=open(sys.argv[3],"w",buffering=1)
+log.write("pid=%d\n" % os.getpid())
 try:
     s.connect((sys.argv[1], int(sys.argv[2])))
     log.write("peer=%s\n" % (s.getpeername(),))
@@ -165,6 +166,12 @@ grep -q "$dest" "$work/client.log" 2>/dev/null \
     || bad "reverse translation" "getpeername did not report $dest: $(tr '\n' ' ' < "$work/client.log")"
 grep -q 'DNAT armed' "$work/helper.log" 2>/dev/null \
     && ok "helper armed the IPv6 DNAT" || bad "helper armed DNAT" "not logged"
+client_pid="$(sed -n 's/^pid=\([0-9][0-9]*\)$/\1/p' "$work/client.log")"
+if [[ "$client_pid" =~ ^[1-9][0-9]*$ ]] && grep -q " pid=$client_pid$" "$work/harness.log"; then
+    ok "IPv6 callback identifies the actual client process"
+else
+    bad "IPv6 process attribution" "callback PID did not match client PID ${client_pid:-missing}"
+fi
 
 echo; echo "=== invalid IPv6 targets are actually rejected (real connections) ==="
 # Each mode makes the harness return a deliberately illegal target. The helper
