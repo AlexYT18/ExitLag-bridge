@@ -82,12 +82,29 @@ A redirected connection goes like this:
    be nonzero, and unspecified, broadcast (IPv4) and multicast addresses are
    rejected. By default the target must be loopback: `127/8`, `::1`, or
    IPv4-mapped `::ffff:127/8`. A rejected mutation arms no redirect.
-5. The SYN is ACCEPTed and continues to `output_nat` (nat hook, dstnat
-   priority), where the map performs the DNAT. Conntrack carries the translation
-   for the rest of the connection, so the steady-state data path is untouched.
+5. Only after a successful map update, the helper ACCEPTs this SYN with
+   `NFQA_PRIORITY` bit31 set. `output_nat` requires this per-packet authorization,
+   consumes the bit before map lookup/DNAT, and leaves all firewall mark bits
+   unchanged. A stale map entry alone cannot authorize another packet.
+   Conntrack carries the translation for the rest of the connection.
 
 The queue sits after conntrack but before NAT specifically so the map element
 can be installed while the SYN is still suspended.
+
+The queue chain clears priority bit31 on TCP SYNs within the configured UID and
+destination scope before loopback, existing-DNAT and queue-bypass paths. New NAT
+also requires that scope. A filter output hook at -99 clears any residual bit even
+when conntrack skips the NAT chain. Other 31 priority bits are retained. Bit31
+is reserved: custom tc classids/QoS using it on SYNs need a different allocation
+before enabling this backend for their traffic. Outside that scope priorities
+are untouched. External privileged rules between these hooks
+can interfere; arbitrary VPN/firewall coexistence is not verified.
+
+The authorization uses priority rather than fwmark because NFQUEUE reinjection
+can recalculate a route from a changed mark before resuming later hooks. The
+helper never writes `NFQA_MARK`. This gate prevents new NAT-map decisions; it
+does not revoke old conntrack translations or make ownership revalidation atomic.
+See the [authorization regression report](audit/TCP_AUTHORIZATION_ITERATION.md).
 
 Historical WoW observations reported a connection whose application-visible
 game-server endpoint was translated to an ExitLag listener on `127.0.0.1`.

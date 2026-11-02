@@ -5,6 +5,12 @@ Baseline audit: [INITIAL_AUDIT.md](INITIAL_AUDIT.md). This roadmap is a work que
 Current requested development target: **Arch Linux x86_64 only**. Other platform
 code is preserved from upstream; it is outside this iteration's support scope.
 
+Latest checkpoints: [TCP attribution](TCP_ATTRIBUTION_ITERATION.md) and
+[per-packet DNAT authorization](TCP_AUTHORIZATION_ITERATION.md). New NAT-map
+decisions require a current successful callback. Next: cached conntrack tuple
+reuse and project-owned flow cleanup; then shared-fd attribution and shim
+worker lifecycle. These checkpoints do not close the complete P1 lifecycle.
+
 ## Validation levels
 
 - **L1:** no account/game or networking privileges. Source builds, pure unit tests, loopback mock IPC, malformed inputs, static analysis and supported sanitizers. A sandbox denying socket creation must report that specific blockage.

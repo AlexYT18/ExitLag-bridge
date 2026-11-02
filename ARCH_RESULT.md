@@ -5,7 +5,8 @@
 совместимость с играми и стабильный релиз пока не подтверждены.
 
 - [Полный отчёт об изменениях и проверках](docs/audit/ITERATION_REPORT.md)
-- [Следующая итерация: TCP attribution и точка продолжения](docs/audit/TCP_ATTRIBUTION_ITERATION.md)
+- [TCP attribution](docs/audit/TCP_ATTRIBUTION_ITERATION.md)
+- [Текущая итерация: авторизация DNAT и точка продолжения](docs/audit/TCP_AUTHORIZATION_ITERATION.md)
 - [Начальный аудит](docs/audit/INITIAL_AUDIT.md)
 - [Все 185 исходных файлов](docs/audit/FILE_INVENTORY.md)
 - [Перечень изменённых файлов](docs/audit/CHANGED_FILES.md)

@@ -18,6 +18,10 @@ installers/      shared setup, pinned runtime catalog and Linux packaging
 ```
 
 `backend/exitlag-netd.c` coordinates attribution, callbacks and packet decisions.
+`tcp_attribution.{c,h}` matches complete TCP tuples; `process_identity.{c,h}`
+checks process birth, UID and held sockets. `ipc_transport.{c,h}` bounds IPC
+transactions. `nfq_verdict.{c,h}` encodes bounded NFQUEUE verdicts and the
+transient priority authorization consumed by nft rules.
 `backend/protocol.h` defines the EXL1 wire layout. The active developer runners
 use `backend/runtime-guard.sh` for lock/pidfile ownership and recovery, and
 `nft-setup.sh` / `nft-teardown.sh` for the dedicated firewall table. Packaged
