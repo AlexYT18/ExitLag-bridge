@@ -18,7 +18,8 @@ ok(){ printf '  PASS  %s\n' "$1"; pass=$((pass+1)); }
 bad(){ printf '  FAIL  %s -- %s\n' "$1" "$2"; fail=$((fail+1)); }
 [[ $EUID -eq 0 ]] || { echo "run with sudo" >&2; exit 1; }
 cleanup(){ set +e; [[ -n "${helper_pid:-}" ]] && kill "$helper_pid" 2>/dev/null
-           "$repo_root/backend/nft-teardown.sh" >/dev/null 2>&1; rm -rf "$work"; }
+           [[ -n "${helper_pid:-}" ]] && wait "$helper_pid" 2>/dev/null
+           rm -rf "$work"; }
 trap cleanup EXIT
 
 # EXITLAG_NETD_BIN lets this run against a sanitized build without duplicating

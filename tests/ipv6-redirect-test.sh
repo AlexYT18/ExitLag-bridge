@@ -14,6 +14,8 @@
 set -uo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/run-all.sh"
+have_isolation || { echo 'SKIP: use tests/run-isolated.sh (network and PID isolation required)' >&2; exit 77; }
 port="${EXL_TEST_PORT:-51920}"
 listen_port="${EXL_V6_LISTEN:-39999}"
 # A real, routable external IPv6 so the kernel actually emits a SYN to queue.
@@ -36,8 +38,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-ip -6 addr show dev lo 2>/dev/null | grep -q '::1' || { echo "no IPv6 loopback; skipping" >&2; exit 0; }
-ip -6 route get "$dest" >/dev/null 2>&1 || { echo "no IPv6 route to $dest; skipping (needs IPv6 connectivity)" >&2; exit 0; }
+ip -6 addr show dev lo 2>/dev/null | grep -q '::1' || { echo "no IPv6 loopback; SKIP: IPv6 loopback unavailable" >&2; exit 77; }
+ip -6 route get "$dest" >/dev/null 2>&1 || { echo "no IPv6 route to $dest; SKIP: needs IPv6 connectivity" >&2; exit 77; }
 
 # ---- local IPv6 listener standing in for ExitLag's proxy -------------------
 python3 - "$listen_port" "$work/listener.log" <<'PY' &

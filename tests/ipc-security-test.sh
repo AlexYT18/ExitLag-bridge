@@ -138,9 +138,9 @@ malformed "routing message before auth" "struct.pack('<IHHI',$MAGIC,0x0011,0,0)"
 malformed "unknown message type"       "struct.pack('<IHHI',$MAGIC,0x7FFF,0,0)"
 malformed "immediate disconnect"       "b''"
 malformed "junk burst"                 "struct.pack('<IHHI',$MAGIC,1,0,16)+b'A'*4096"
-[[ "$(handshake "$new_token" 3 64)" == ACCEPTED ]] \
-    && ok "oversized but valid hello accepted (trailing bytes drained)" \
-    || bad "oversized valid hello" "rejected"
+[[ "$(handshake "$new_token" 3 64)" == REJECTED ]] \
+    && ok "token-bearing hello with surplus bytes refused" \
+    || bad "oversized hello refused" "accepted"
 
 # -------------------------------------------- authenticated, then hostile
 echo; echo "=== malformed traffic AFTER a successful handshake ==="

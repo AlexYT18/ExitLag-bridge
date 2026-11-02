@@ -23,6 +23,9 @@ port="$(cat "$work/port")"
 
 # launcher binary that survives + differently-named client that owns the socket
 mkdir -p "$work/bin"
+# Copied standalone interpreters need the original stdlib prefix, while their
+# executable paths remain distinct for the real /proc ownership assertions.
+fixture_python_home="$(python3 -c 'import sys; print(sys.prefix)')"
 cp "$(readlink -f "$(command -v python3)")" "$work/bin/game-launcher"
 cp "$(readlink -f "$(command -v python3)")" "$work/bin/game-client"
 cat > "$work/launcher.py" <<EOF
@@ -36,7 +39,7 @@ s=socket.create_connection(("127.0.0.1", int(sys.argv[1])))
 with open(sys.argv[2], "w") as ready: ready.write(str(os.getpid()))
 time.sleep(60)
 EOF
-setsid "$work/bin/game-launcher" "$work/launcher.py" >/dev/null 2>&1 &
+setsid env PYTHONHOME="$fixture_python_home" "$work/bin/game-launcher" "$work/launcher.py" >/dev/null 2>&1 &
 launcher_pid=$!
 # Wait for the actual network-owning child, not a timing assumption about a
 # newly copied interpreter starting on a busy CI runner.

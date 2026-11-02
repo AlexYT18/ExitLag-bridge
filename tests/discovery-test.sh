@@ -35,6 +35,9 @@ port="$(cat "$work/port")"
 # excluded) that execs a differently-named client binary which owns the socket.
 # Two copies of the interpreter give two distinct /proc/<pid>/exe values.
 mkdir -p "$work/bin"
+# Standalone Python builds locate their stdlib relative to the executable.
+# Preserve its real prefix when giving the fixture distinct /proc/exe paths.
+fixture_python_home="$(python3 -c 'import sys; print(sys.prefix)')"
 cp "$(readlink -f "$(command -v python3)")" "$work/bin/game-launcher"
 cp "$(readlink -f "$(command -v python3)")" "$work/bin/game-client"
 cat > "$work/launcher.py" <<EOF
@@ -50,7 +53,7 @@ s = socket.create_connection(("127.0.0.1", int(sys.argv[1])))
 time.sleep(60)
 EOF
 
-setsid "$work/bin/game-launcher" "$work/launcher.py" >/dev/null 2>&1 &
+setsid env PYTHONHOME="$fixture_python_home" "$work/bin/game-launcher" "$work/launcher.py" >/dev/null 2>&1 &
 launcher_pid=$!
 sleep 3
 

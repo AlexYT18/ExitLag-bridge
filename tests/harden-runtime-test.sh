@@ -12,13 +12,16 @@
 set -uo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+# Global process-name cleanup below is confined to a disposable PID namespace.
+source "$repo_root/tests/run-all.sh"
+have_isolation || { echo 'SKIP: use tests/run-isolated.sh (network and PID isolation required)' >&2; exit 77; }
 queue="${QUEUE_NUM:-0}"
 port="${EXL_PORT:-51900}"
 probe_dest="${PROBE_DEST:-66.40.178.239}"
 probe_port="${PROBE_PORT:-3724}"
 stamp="$(date +%Y%m%dT%H%M%S)"
 outdir="$repo_root/runtime/logs/harden-$stamp"
-pass=0; fail=0; results=()
+pass=0; fail=0; skip=0; results=()
 
 [[ $EUID -eq 0 ]] || { echo "run with sudo (NFQUEUE/nftables need CAP_NET_ADMIN)" >&2; exit 1; }
 mkdir -p "$outdir"
@@ -26,6 +29,7 @@ mkdir -p "$outdir"
 say()  { printf '\n=== %s ===\n' "$*"; }
 ok()   { results+=("PASS  $1"); pass=$((pass+1)); printf '  PASS  %s\n' "$1"; }
 bad()  { results+=("FAIL  $1 -- $2"); fail=$((fail+1)); printf '  FAIL  %s -- %s\n' "$1" "$2"; }
+skipped() { results+=("SKIP  $1 -- $2"); skip=$((skip+1)); printf '  SKIP  %s -- %s\n' "$1" "$2"; }
 
 table_present() { nft list table inet exitlag >/dev/null 2>&1; }
 helper_running() { pgrep -x exitlag-netd >/dev/null 2>&1; }
@@ -168,6 +172,16 @@ scenario_helper_crash() {
 
 scenario_shim_reconnect() {
     say "shim reconnect after connected-but-silent helper"
+    local dependency
+    for dependency in clang-cl lld-link llvm-dlltool; do
+        if ! command -v "$dependency" >/dev/null; then
+            skipped "shim reconnect" "missing $dependency"; return
+        fi
+    done
+    if [[ ! -x "$repo_root/wine-wbemprox/runtime-staging/x86_64-unix/wine" || \
+          ! -d "$repo_root/runtime/prefix-game" ]]; then
+        skipped "shim reconnect" "requires prepared project Wine runtime and prefix"; return
+    fi
     local run_user="${SUDO_USER:-$(stat -c %U "$repo_root")}"
     local reconnect_out="$outdir/reconnect-smoketest.txt"
     if runuser -u "$run_user" -- "$repo_root/tests/test-shim-reconnect.sh" >"$reconnect_out" 2>&1; then
@@ -257,8 +271,11 @@ scenario_runner_signals() {
     local sig
     for sig in TERM INT; do
         local out="$outdir/signal-$sig.txt"
+        # Bash marks asynchronous children SIGINT-ignored. Restore the normal
+        # disposition before exec so this exercises the runner's real trap.
         TEST_DEST="$probe_dest" ENABLE_REDIRECT=1 \
             NETD_LOG="$outdir/signal-$sig-helper.log" \
+            python3 -c 'import os, signal, sys; signal.signal(signal.SIGINT, signal.SIG_DFL); os.execv(sys.argv[1], sys.argv[1:])' \
             "$repo_root/backend/run-tcp-redirect.sh" 120 >"$out" 2>&1 &
         local runner_pid=$!
         local ready=0
@@ -275,7 +292,27 @@ scenario_runner_signals() {
         fi
 
         kill -"$sig" "$runner_pid" 2>/dev/null
-        wait "$runner_pid" 2>/dev/null
+        local stopped=0 status=0 expected_status=143
+        [[ "$sig" == INT ]] && expected_status=130
+        for _ in $(seq 1 100); do
+            if ! kill -0 "$runner_pid" 2>/dev/null; then stopped=1; break; fi
+            sleep 0.05
+        done
+        if (( ! stopped )); then
+            kill -TERM "$runner_pid" 2>/dev/null
+            sleep 0.1
+            kill -KILL "$runner_pid" 2>/dev/null
+            wait "$runner_pid" 2>/dev/null
+            bad "runner SIG$sig" "runner exceeded the five-second signal cleanup deadline"
+            teardown_all
+            continue
+        fi
+        wait "$runner_pid" 2>/dev/null || status=$?
+        if (( status != expected_status )); then
+            bad "runner SIG$sig" "exit $status instead of signal-specific $expected_status"
+            teardown_all
+            continue
+        fi
         # Give the EXIT trap a moment to finish its teardown.
         local settled=0
         for _ in $(seq 1 100); do
@@ -308,7 +345,7 @@ done
 
 say "summary"
 printf '%s\n' "${results[@]}"
-printf '\n%d passed, %d failed\n' "$pass" "$fail"
+printf '\n%d passed, %d failed, %d skipped\n' "$pass" "$fail" "$skip"
 echo "logs: $outdir"
 
 teardown_all
