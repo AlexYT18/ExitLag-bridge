@@ -6,6 +6,9 @@
 // research overrides and are not needed by the normal runtime.
 
 #include "ipc_validation.h"
+#include "socket_attribution.h"
+#include "tcp_callback_policy.h"
+#include "pid_domain.h"
 
 typedef void *HANDLE;
 typedef unsigned long DWORD;
@@ -1216,24 +1219,25 @@ static unsigned int g_udp_rule_count;
 static unsigned int g_udp_control_count;
 static volatile long g_send_lock;
 
-// PIDs observed on the Linux side. A Windows PID could share the same numeric
-// value, so origin is tracked explicitly rather than guessed from the number.
-static unsigned int g_linux_pids[128];
-static volatile long g_linux_pid_count;
+using exl_pid_domain::pid_origin;
+using exl_pid_domain::pid_unknown;
+using exl_pid_domain::pid_linux;
+using exl_pid_domain::pid_windows;
+using exl_pid_domain::pid_ambiguous;
 
-static void remember_linux_pid(unsigned int pid)
+// Numeric Windows and Linux PIDs can collide. Record both observed domains
+// without eviction; collisions and saturation disable attributed callbacks.
+// This POD is never reset while worker/SDK calls can still refer to old PIDs.
+static exl_pid_domain::registry g_process_pids;
+
+static bool remember_process_pid(unsigned int pid, pid_origin domain)
 {
-    if (!pid) return;
-    for (int i = 0; i < 128; ++i) if (g_linux_pids[i] == pid) return;
-    long slot = __atomic_fetch_add(&g_linux_pid_count, 1, __ATOMIC_SEQ_CST);
-    g_linux_pids[slot & 127] = pid;
+    return exl_pid_domain::remember_pid(g_process_pids, pid, domain);
 }
 
-static bool is_linux_pid(unsigned int pid)
+static pid_origin process_pid_origin(unsigned int pid)
 {
-    if (!pid) return false;
-    for (int i = 0; i < 128; ++i) if (g_linux_pids[i] == pid) return true;
-    return false;
+    return exl_pid_domain::lookup_pid(g_process_pids, pid);
 }
 
 static bool send_all(SOCKET s, const char *data, int length)
@@ -1362,123 +1366,84 @@ static void report_udp_state(unsigned int api, ENDPOINT_ID id, int status,
 
 
 // ---- flow -> owning Windows PID -------------------------------------------
-#pragma pack(push, 4)
-struct MIB_TCPROW_OWNER_PID {
-    unsigned long state, localAddr, localPort, remoteAddr, remotePort, owningPid;
-};
-struct MIB_TCP6ROW_OWNER_PID {
-    unsigned char localAddr[16]; unsigned long localScope, localPort;
-    unsigned char remoteAddr[16]; unsigned long remoteScope, remotePort;
-    unsigned long state, owningPid;
-};
-struct MIB_UDPROW_OWNER_PID {
-    unsigned long localAddr, localPort, owningPid;
-};
-struct MIB_UDP6ROW_OWNER_PID {
-    unsigned char localAddr[16]; unsigned long localScope, localPort, owningPid;
-};
-#pragma pack(pop)
 #define TCP_TABLE_OWNER_PID_ALL 5
 #define UDP_TABLE_OWNER_PID 1
 #define AF_INET_  2
 #define AF_INET6_ 23
 
-// sockaddr form used on the wire: family(2) port(2, network order) then address.
-static unsigned int owning_windows_pid(const unsigned char *local, const unsigned char *remote)
+static_assert(sizeof(unsigned long) == sizeof(exl_socket_attribution::u32),
+              "iphlpapi DWORD argument must retain the Windows ABI");
+
+static exl_socket_attribution::owner_result query_windows_tcp_owner(
+    unsigned char *buffer, unsigned long capacity, unsigned int family,
+    const unsigned char *local, const unsigned char *remote, bool mapped)
+{
+    unsigned long size = capacity;
+    if (GetExtendedTcpTable(buffer, &size, 0, family, TCP_TABLE_OWNER_PID_ALL, 0))
+        return exl_socket_attribution::result(exl_socket_attribution::owner_unavailable);
+    if (mapped)
+        return exl_socket_attribution::lookup_tcp_mapped_owner(buffer, capacity, size,
+                                                              local, 28, remote, 28);
+    return exl_socket_attribution::lookup_tcp_owner(buffer, capacity, size,
+                                                   family, local, 28, remote, 28);
+}
+
+// Endpoints use Windows sockaddr layouts; the portable decoder checks the
+// complete tuple and returned table span before choosing a Windows PID.
+static exl_socket_attribution::owner_result owning_windows_pid(
+    const unsigned char *local, const unsigned char *remote)
 {
     static unsigned char buffer[512 * 1024];
-    unsigned short family = (unsigned short)(local[0] | (local[1] << 8));
-    unsigned short local_port_net = (unsigned short)((local[2] << 8) | local[3]);
-    unsigned long size = sizeof(buffer);
-
-    if (family == AF_INET_) {
-        if (GetExtendedTcpTable(buffer, &size, 0, AF_INET_, TCP_TABLE_OWNER_PID_ALL, 0)) return 0;
-        unsigned long count = *(const unsigned long *)buffer;
-        const MIB_TCPROW_OWNER_PID *rows = (const MIB_TCPROW_OWNER_PID *)(buffer + 4);
-        for (unsigned long i = 0; i < count; ++i) {
-            unsigned short port = (unsigned short)(((rows[i].localPort & 0xff) << 8) | ((rows[i].localPort >> 8) & 0xff));
-            if (port != local_port_net) continue;
-            const unsigned char *a = (const unsigned char *)&rows[i].localAddr;
-            if (a[0] == local[4] && a[1] == local[5] && a[2] == local[6] && a[3] == local[7])
-                return (unsigned int)rows[i].owningPid;
-        }
-        return 0;
-    }
-    if (family == AF_INET6_) {
-        if (GetExtendedTcpTable(buffer, &size, 0, AF_INET6_, TCP_TABLE_OWNER_PID_ALL, 0)) return 0;
-        unsigned long count = *(const unsigned long *)buffer;
-        const MIB_TCP6ROW_OWNER_PID *rows = (const MIB_TCP6ROW_OWNER_PID *)(buffer + 4);
-        for (unsigned long i = 0; i < count; ++i) {
-            unsigned short port = (unsigned short)(((rows[i].localPort & 0xff) << 8) | ((rows[i].localPort >> 8) & 0xff));
-            if (port != local_port_net) continue;
-            bool same = true;
-            for (int b = 0; b < 16; ++b) if (rows[i].localAddr[b] != local[8 + b]) { same = false; break; }
-            if (same) return (unsigned int)rows[i].owningPid;
-        }
-        return 0;
-    }
-    return 0;
+    unsigned int family = exl_socket_attribution::endpoint_family(local, 28);
+    if (!exl_socket_attribution::valid_endpoint(local, 28, family) ||
+        !exl_socket_attribution::valid_endpoint(remote, 28, family))
+        return exl_socket_attribution::result(exl_socket_attribution::owner_invalid);
+    exl_socket_attribution::owner_result exact = query_windows_tcp_owner(
+        buffer, sizeof(buffer), family, local, remote, false);
+    if (family != AF_INET_ ||
+        (exact.status != exl_socket_attribution::owner_none &&
+         exact.status != exl_socket_attribution::owner_unavailable)) return exact;
+    // A dual-stack socket can be listed under IPv6 while its packets are IPv4.
+    // Query that table only after no exact IPv4 owner was obtained, constructing
+    // both explicit mapped endpoints with zero scopes. Runtime Wine behavior is
+    // not assumed by the native fixtures; errors retain their unavailable state.
+    exl_socket_attribution::owner_result mapped = query_windows_tcp_owner(
+        buffer, sizeof(buffer), AF_INET6_, local, remote, true);
+    return exl_socket_attribution::combine_tcp_owners(exact, mapped);
 }
 
 /* UDP has no remote tuple in the owner table. Prefer an exact local-address
    match, but accept an ANY-bound socket on the same port: sendto() packets carry
-   the selected interface address even when the application bound 0.0.0.0. */
+   the selected interface address even when the application bound 0.0.0.0.
+   This change bounds table reads; ambiguity and scope semantics are unchanged. */
 static unsigned int owning_windows_udp_pid(const unsigned char *local)
 {
     static unsigned char buffer[512 * 1024];
-    unsigned short family = (unsigned short)(local[0] | (local[1] << 8));
-    unsigned short local_port_net = (unsigned short)((local[2] << 8) | local[3]);
+    unsigned int family = exl_socket_attribution::endpoint_family(local, 28);
+    if (family != AF_INET_ && family != AF_INET6_) return 0;
     unsigned long size = sizeof(buffer);
-    unsigned int wildcard_pid = 0;
-
-    if (family == AF_INET_) {
-        if (GetExtendedUdpTable(buffer, &size, 0, AF_INET_, UDP_TABLE_OWNER_PID, 0)) return 0;
-        unsigned long count = *(const unsigned long *)buffer;
-        const MIB_UDPROW_OWNER_PID *rows = (const MIB_UDPROW_OWNER_PID *)(buffer + 4);
-        for (unsigned long i = 0; i < count; ++i) {
-            unsigned short port = (unsigned short)(((rows[i].localPort & 0xff) << 8) | ((rows[i].localPort >> 8) & 0xff));
-            if (port != local_port_net) continue;
-            const unsigned char *a = (const unsigned char *)&rows[i].localAddr;
-            if (a[0] == local[4] && a[1] == local[5] && a[2] == local[6] && a[3] == local[7])
-                return (unsigned int)rows[i].owningPid;
-            if (!rows[i].localAddr) wildcard_pid = (unsigned int)rows[i].owningPid;
-        }
-        return wildcard_pid;
-    }
-    if (family == AF_INET6_) {
-        if (GetExtendedUdpTable(buffer, &size, 0, AF_INET6_, UDP_TABLE_OWNER_PID, 0)) return 0;
-        unsigned long count = *(const unsigned long *)buffer;
-        const MIB_UDP6ROW_OWNER_PID *rows = (const MIB_UDP6ROW_OWNER_PID *)(buffer + 4);
-        for (unsigned long i = 0; i < count; ++i) {
-            unsigned short port = (unsigned short)(((rows[i].localPort & 0xff) << 8) | ((rows[i].localPort >> 8) & 0xff));
-            if (port != local_port_net) continue;
-            bool same = true, any = true;
-            for (int b = 0; b < 16; ++b) {
-                if (rows[i].localAddr[b] != local[8 + b]) same = false;
-                if (rows[i].localAddr[b]) any = false;
-            }
-            if (same) return (unsigned int)rows[i].owningPid;
-            if (any) wildcard_pid = (unsigned int)rows[i].owningPid;
-        }
-        return wildcard_pid;
-    }
-    return 0;
+    if (GetExtendedUdpTable(buffer, &size, 0, family, UDP_TABLE_OWNER_PID, 0)) return 0;
+    return exl_socket_attribution::udp_owner_pid(buffer, sizeof(buffer), size,
+                                                family, local, 28);
 }
 
-struct udp_owner_entry { unsigned __int64 id; unsigned int pid; };
+struct udp_owner_entry { unsigned __int64 id; unsigned int pid; pid_origin domain; };
 static udp_owner_entry g_udp_owners[1024];
 
-static void remember_udp_owner(unsigned __int64 id, unsigned int pid)
+static void remember_udp_owner(unsigned __int64 id, unsigned int pid, pid_origin domain)
 {
     unsigned int slot = (unsigned int)(id & 1023);
     g_udp_owners[slot].id = id;
     g_udp_owners[slot].pid = pid;
+    g_udp_owners[slot].domain = domain;
 }
 
-static unsigned int known_udp_owner(unsigned __int64 id)
+static unsigned int known_udp_owner(unsigned __int64 id, pid_origin &domain)
 {
     const udp_owner_entry &entry = g_udp_owners[(unsigned int)(id & 1023)];
-    return entry.id == id ? entry.pid : 0;
+    if (entry.id != id) { domain = pid_unknown; return 0; }
+    domain = entry.domain;
+    return entry.pid;
 }
 
 // Invokes ExitLag's real tcpConnectRequest (vtable slot 2) with a structure
@@ -1488,9 +1453,21 @@ static void handle_tcp_connect(const exl_tcp_connect_req &req, exl_tcp_connect_r
     // Prefer the real Windows owner: that is what ExitLag expects, and it lets
     // nf_getProcessNameFromKernel answer from OpenProcess directly. Only fall
     // back to the helper's Linux PID when the flow belongs to a non-Wine process.
-    unsigned int windows_pid = owning_windows_pid(req.local_address, req.remote_address);
-    unsigned int process_id = windows_pid ? windows_pid : req.process_id;
-    if (!windows_pid) remember_linux_pid(process_id);
+    exl_tcp_callback_policy::passthrough_reply(req, reply);
+    exl_socket_attribution::owner_result windows_owner =
+        owning_windows_pid(req.local_address, req.remote_address);
+    exl_tcp_callback_policy::process_selection selected =
+        exl_tcp_callback_policy::select_process(windows_owner, req.process_id);
+    unsigned int process_id = selected.pid;
+    if (!process_id || !remember_process_pid(process_id, selected.origin) ||
+        process_pid_origin(process_id) != selected.origin) {
+        trace::line rejected; trace::prefix(rejected, "ipc.tcpConnectRequest.skipped");
+        rejected.text(" reason=unverified-or-ambiguous-owner windows_status=");
+        rejected.decimal((unsigned int)windows_owner.status);
+        trace::finish(rejected);
+        return;
+    }
+    bool windows_pid = selected.origin == pid_windows;
 
     reply.tag = req.tag; reply.mutated_flag = 0; reply.mutated_remote = 0;
     reply.reserved[0] = reply.reserved[1] = 0;
@@ -1525,6 +1502,16 @@ static void handle_tcp_connect(const exl_tcp_connect_req &req, exl_tcp_connect_r
 
     ((cb_id_ptr)inject::slot(2))(inject::g_handler, req.endpoint_id, &info);
 
+    if (process_pid_origin(process_id) != selected.origin) {
+        // A concurrent SDK/event observation exposed a cross-domain collision.
+        // Discard this callback mutation rather than apply an ambiguous name.
+        exl_tcp_callback_policy::passthrough_reply(req, reply);
+        trace::line rejected; trace::prefix(rejected, "ipc.tcpConnectRequest.skipped");
+        rejected.text(" reason=pid-domain-changed-during-callback");
+        trace::finish(rejected);
+        return;
+    }
+
     trace::line post; trace::prefix(post, "ipc.tcpConnectRequest.return");
     post.text(" tag="); post.hex(req.tag);
     post.text(" after: filteringFlag="); post.hex(info.filteringFlag);
@@ -1544,10 +1531,15 @@ static void handle_tcp_connect(const exl_tcp_connect_req &req, exl_tcp_connect_r
 static unsigned int effective_udp_pid(unsigned __int64 id, unsigned int linux_pid,
                                       const unsigned char *local, bool refresh)
 {
-    unsigned int pid = refresh ? owning_windows_udp_pid(local) : known_udp_owner(id);
-    if (!pid) pid = owning_windows_udp_pid(local);
-    if (!pid) { pid = linux_pid; remember_linux_pid(pid); }
-    if (pid) remember_udp_owner(id, pid);
+    pid_origin domain = pid_unknown;
+    unsigned int pid = refresh ? 0 : known_udp_owner(id, domain);
+    if (!pid) {
+        pid = owning_windows_udp_pid(local);
+        domain = pid_windows;
+    }
+    if (!pid) { pid = linux_pid; domain = pid_linux; }
+    if (!remember_process_pid(pid, domain)) return 0;
+    remember_udp_owner(id, pid, domain);
     return pid;
 }
 
@@ -1576,13 +1568,16 @@ static void handle_udp_lifecycle(const exl_udp_lifecycle_req &req,
     trace::line out; trace::prefix(out, name);
     out.text(" tag="); out.hex(req.tag); out.text(" id="); out.hex(req.endpoint_id);
     out.text(" processId="); out.decimal(process_id);
-    out.text(process_id != req.process_id ? "(windows)" : "(linux)");
+    out.text(process_pid_origin(process_id) == pid_windows ? "(windows)" : "(linux)");
     out.text(" local="); trace::sockaddr_text(out, info.localAddress);
     out.text(" beforeRaw="); out.byte_array((const unsigned char *)&info, sizeof(info));
 
     reply.tag = req.tag; reply.process_id = process_id; reply.mutated_info = 0;
     reply.reserved[0] = reply.reserved[1] = reply.reserved[2] = 0;
-    if (!inject::g_handler) {
+    if (!process_id) {
+        out.text(" verdict=unresolved-pid"); trace::finish(out);
+        reply.verdict = EXL_VERDICT_UNCHANGED;
+    } else if (!inject::g_handler) {
         out.text(" verdict=no-handler"); trace::finish(out);
         reply.verdict = EXL_VERDICT_NO_HANDLER;
     } else {
@@ -1618,7 +1613,7 @@ static void handle_udp_connect(const exl_udp_connect_req &req, exl_udp_connect_r
     trace::line out; trace::prefix(out, "ipc.udpConnectRequest");
     out.text(" tag="); out.hex(req.tag); out.text(" id="); out.hex(req.endpoint_id);
     out.text(" processId="); out.decimal(process_id);
-    out.text(process_id != req.process_id ? "(windows)" : "(linux)");
+    out.text(process_pid_origin(process_id) == pid_windows ? "(windows)" : "(linux)");
     out.text(" filteringFlag="); out.hex(info.filteringFlag);
     out.text(" local="); trace::sockaddr_text(out, info.localAddress);
     out.text(" remote="); trace::sockaddr_text(out, info.remoteAddress);
@@ -1627,7 +1622,10 @@ static void handle_udp_connect(const exl_udp_connect_req &req, exl_udp_connect_r
     reply.tag = req.tag; reply.process_id = process_id;
     reply.mutated_flag = 0; reply.mutated_remote = 0;
     reply.reserved[0] = reply.reserved[1] = 0;
-    if (!inject::g_handler) {
+    if (!process_id) {
+        out.text(" verdict=unresolved-pid"); trace::finish(out);
+        reply.verdict = EXL_VERDICT_UNCHANGED;
+    } else if (!inject::g_handler) {
         out.text(" verdict=no-handler"); trace::finish(out);
         reply.verdict = EXL_VERDICT_NO_HANDLER;
     } else {
@@ -1659,6 +1657,14 @@ static void handle_udp_datagram(exl_udp_datagram_req &req, unsigned int frame_le
     unsigned int trailing = frame_length >= sizeof(req) ? frame_length - (unsigned int)sizeof(req) : 0;
     if (req.options_length > trailing || req.payload_length > trailing - req.options_length ||
         req.options_length > 4096 || req.payload_length > 65535) return;
+    unsigned int process_id = effective_udp_pid(req.endpoint_id, req.process_id,
+                                                 req.local_address, false);
+    if (!process_id) {
+        reply.verdict = EXL_VERDICT_UNCHANGED;
+        trace::line out; trace::prefix(out, "ipc.udpDatagram");
+        out.text(" id="); out.hex(req.endpoint_id); out.text(" verdict=unresolved-pid");
+        trace::finish(out); return;
+    }
 
     unsigned char *base = (unsigned char *)&req;
     unsigned char *option_bytes = base + sizeof(req);
@@ -1680,7 +1686,7 @@ static void handle_udp_datagram(exl_udp_datagram_req &req, unsigned int frame_le
 
     trace::line out; trace::prefix(out, req.direction == 2 ? "ipc.udpSend" : "ipc.udpReceive");
     out.text(" tag="); out.hex(req.tag); out.text(" id="); out.hex(req.endpoint_id);
-    out.text(" processId="); out.decimal(known_udp_owner(req.endpoint_id));
+    out.text(" processId="); out.decimal(process_id);
     out.text(" local="); trace::sockaddr_text(out, req.local_address);
     out.text(" remote="); trace::sockaddr_text(out, req.remote_address);
     out.text(" len="); out.decimal(req.payload_length); out.text(" payloadHead:");
@@ -1899,13 +1905,24 @@ NFAPI_EXPORT int nf_getProcessNameFromKernel(unsigned long process_id, wchar_t *
     // The real driver answers from the kernel; here the answer is taken from the
     // OS for the same PID. No name is invented: if the process cannot be opened
     // or queried, the call still fails.
+    ipc::pid_origin origin = ipc::process_pid_origin(process_id);
+    if (origin == ipc::pid_ambiguous) {
+        if (buffer && length) buffer[0] = 0;
+        out.text(" source=ambiguous policy=fail");
+        trace::result(out, 0); trace::finish(out); return 0;
+    }
     if (!trace::policy_succeeds("nf_getProcessNameFromKernel") || !buffer || !length) {
         out.text(" policy=fail"); trace::result(out, 0); trace::finish(out); return 0;
     }
     // A PID reported by the helper is a Linux PID and must be resolved there;
     // calling OpenProcess with it could name an unrelated Wine process.
-    if (ipc::is_linux_pid(process_id)) {
+    if (origin == ipc::pid_linux) {
         int ok = ipc::resolve_linux_pid(process_id, buffer, length);
+        // A second domain can be recorded while the helper is answering. Never
+        // return a name after the numeric PID has become ambiguous.
+        if (ipc::process_pid_origin(process_id) != ipc::pid_linux) {
+            buffer[0] = 0; ok = 0;
+        }
         out.text(" source=helper policy=succeed");
         if (ok) { out.text(" name="); out.wide_ascii(buffer, 260); }
         else out.text(" name=unresolved");
@@ -1913,12 +1930,19 @@ NFAPI_EXPORT int nf_getProcessNameFromKernel(unsigned long process_id, wchar_t *
     }
     HANDLE process = OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */, 0, process_id);
     if (!process) {
+        if (ipc::process_pid_origin(process_id) == ipc::pid_ambiguous) buffer[0] = 0;
         out.text(" source=windows policy=succeed openProcess=failed");
         trace::result(out, 0); trace::finish(out); return 0;
     }
     DWORD written = length;
     BOOL ok = QueryFullProcessImageNameW(process, 0, buffer, &written);
     CloseHandle(process);
+    ipc::pid_origin current_origin = ipc::process_pid_origin(process_id);
+    if (current_origin == ipc::pid_linux || current_origin == ipc::pid_ambiguous) {
+        buffer[0] = 0;
+        out.text(" source=changed-domain policy=fail");
+        trace::result(out, 0); trace::finish(out); return 0;
+    }
     if (!ok) {
         out.text(" policy=succeed queryImageName=failed");
         trace::result(out, 0); trace::finish(out); return 0;

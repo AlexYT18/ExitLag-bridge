@@ -1,5 +1,6 @@
 // Cloud-safe tests for the exact freestanding helpers used by nfapi.dll.
 #include "../shim/nfapi/ipc_validation.h"
+#include "../shim/nfapi/tcp_callback_policy.h"
 
 #include <climits>
 #include <cstdio>
@@ -179,11 +180,65 @@ static void pid_reply_tests()
             full_path[reply.path_length + 2] == 0x1234, "maximum PID copy canary changed");
 }
 
+static void tcp_callback_policy_tests()
+{
+    using namespace exl_socket_attribution;
+    const owner_status rejected[] = {owner_invalid, owner_ambiguous,
+                                    (owner_status)99};
+    for (owner_status status : rejected) {
+        for (unsigned int fallback : {0u, 123u}) {
+            const auto selected = exl_tcp_callback_policy::select_process(result(status), fallback);
+            require(!selected.pid && selected.origin == exl_pid_domain::pid_unknown,
+                    "invalid/ambiguous Windows ownership allowed a Linux fallback");
+        }
+    }
+    for (owner_status status : {owner_none, owner_unavailable}) {
+        auto selected = exl_tcp_callback_policy::select_process(result(status), 123);
+        require(selected.pid == 123 && selected.origin == exl_pid_domain::pid_linux,
+                "verified nonzero Linux fallback was lost");
+        require(!exl_tcp_callback_policy::select_process(result(status), 0).pid,
+                "PID zero selected a TCP callback");
+        require(!exl_tcp_callback_policy::select_process(result(status, 5), 123).pid,
+                "inconsistent no-owner result selected a TCP callback");
+    }
+    auto selected = exl_tcp_callback_policy::select_process(result(owner_found, 5), 123);
+    require(selected.pid == 5 && selected.origin == exl_pid_domain::pid_windows,
+            "exact Windows owner was not preferred");
+    require(!exl_tcp_callback_policy::select_process(result(owner_found), 123).pid,
+            "zero Windows owner was replaced with an unrelated Linux PID");
+
+    exl_pid_domain::registry registry = {};
+    require(exl_pid_domain::remember_pid(registry, 123, exl_pid_domain::pid_linux),
+            "Linux callback PID registration failed");
+    require(!exl_pid_domain::remember_pid(registry, 123, exl_pid_domain::pid_windows),
+            "numeric PID collision was accepted for another callback");
+    require(exl_pid_domain::lookup_pid(registry, 123) == exl_pid_domain::pid_ambiguous,
+            "PID collision lost its fail-closed domain");
+
+    exl_tcp_connect_req request = {};
+    request.tag = ULLONG_MAX;
+    request.filtering_flag = UINT_MAX;
+    for (unsigned int i = 0; i < sizeof(request.remote_address); ++i)
+        request.remote_address[i] = (unsigned char)(i + 17);
+    exl_tcp_connect_reply reply;
+    std::memset(&reply, 0xa5, sizeof(reply));
+    exl_tcp_callback_policy::passthrough_reply(request, reply);
+    require(reply.tag == request.tag && reply.filtering_flag == request.filtering_flag,
+            "skipped callback changed correlation/filtering metadata");
+    require(reply.verdict == EXL_VERDICT_NO_HANDLER,
+            "skipped callback claimed an executed vendor callback");
+    require(!reply.mutated_flag && !reply.mutated_remote &&
+            !reply.reserved[0] && !reply.reserved[1], "skipped callback retained mutation flags");
+    require(!std::memcmp(reply.remote_address, request.remote_address, 28),
+            "skipped callback fabricated a redirect destination");
+}
+
 int main()
 {
     endpoint_tests();
     frame_tests();
     pid_reply_tests();
+    tcp_callback_policy_tests();
     std::printf("PASS: %u shim IPC validation checks (synthetic; no Wine or ExitLag)\n", checks);
     return 0;
 }
