@@ -2,10 +2,11 @@
 
 Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication diff base: `dfdd0ee43e2edb850fec31621e8feffa3dea2715` in the user fork. Includes synthetic validation evidence; excludes generated binaries/private runtime.
 
-38 existing files changed; 92 files added.
+39 existing files changed; 92 files added.
 
 | Status | File |
 | --- | --- |
+| Modified | `.github/workflows/installer-validation.yml` |
 | Modified | `.gitignore` |
 | Modified | `backend/Makefile` |
 | Modified | `backend/exitlag-netd.c` |

@@ -122,3 +122,9 @@ platform SKIP. Дополнительный upstream test увеличил чи�
 Из Linux backend/shim/network harness после первоначальной L2 проверки ничего
 не изменено. GitHub-hosted workflow не считается выполненным на основании
 локального container-прогона.
+
+Автоматический CI в этой ветке ограничен Arch и source privacy. Унаследованный
+Ubuntu installer workflow сохранён с ручным запуском; его ранее начавшийся
+PR-прогон отменён как находящийся вне Arch-only scope. Ключ кеша Windows
+payloads теперь учитывает общий `backend/protocol.h`, чтобы обновление wire
+contract не переиспользовало несовместимую закешированную DLL.

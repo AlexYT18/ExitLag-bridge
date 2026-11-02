@@ -5,7 +5,7 @@
   "sha256": {
     ".github/ISSUE_TEMPLATE/game-compatibility.yml": "0a3a8eed9fa9d89097da7d5ae3205f22d4298e0058291b204a213bfe9d78c6b8",
     ".github/pull_request_template.md": "18a8ac73e95a4e48d7f2f027c6fb280fa28af85219404aa87e2e2a5804daf725",
-    ".github/workflows/installer-validation.yml": "ac7cfc83fd92ae4358611f51702b95ff8b55c013b851040ca20137e73f0f1e7b",
+    ".github/workflows/installer-validation.yml": "7b8193073cbb75f7fe885787171b55ccccc12556f62d64ec13a4de14ec379878",
     ".github/workflows/linux-portable-compatibility.yml": "10458d52e7f457e32e9f473bb9d6788f3341ca3aed49d0fd09e46e4941a40b20",
     ".github/workflows/linux-source-validation.yml": "7fc09b55247a21f2e78c43d2490e40eb787698c5d02108ce85b826f1a31fabda",
     ".github/workflows/source-privacy.yml": "fa7cb44087b476a3a5723e8eb167ccbcbc200ab4e5168549285f9c54dbfeb959",

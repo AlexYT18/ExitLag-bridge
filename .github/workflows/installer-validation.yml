@@ -1,21 +1,8 @@
 name: Installer validation
 on:
   workflow_dispatch:
-  pull_request:
-  push:
-    branches: [main]
-    paths:
-      - 'installers/**'
-      - 'LICENSES/**'
-      - 'THIRD_PARTY.md'
-      - 'docs/provenance-review.md'
-      - 'tests/**'
-      - 'backend/**'
-      - 'shim/**'
-      - 'tools/**'
-      - 'macos/build-*.sh'
-      - 'macos/driver-registration.cpp'
-      - '.github/workflows/installer-validation.yml'
+# Preserve legacy Ubuntu packaging validation as an explicit manual workflow.
+# Automatic validation targets Arch in linux-source-validation.yml.
 concurrency:
   group: installer-validation-${{ github.ref }}
   cancel-in-progress: true
@@ -57,7 +44,7 @@ jobs:
           path: |
             installers/payloads
             build/installer/exitlag-bridge-wine-source.tar.gz
-          key: windows-payload-v1-${{ matrix.os }}-${{ hashFiles('installers/build_runtime.py', 'installers/bridge_setup/catalog.json', 'macos/build-*.sh', 'macos/companion.cpp', 'macos/driver-registration.cpp', 'shim/**', 'wine-wbemprox/patches/**') }}
+          key: windows-payload-v1-${{ matrix.os }}-${{ hashFiles('installers/build_runtime.py', 'installers/bridge_setup/catalog.json', 'macos/build-*.sh', 'macos/companion.cpp', 'macos/driver-registration.cpp', 'backend/protocol.h', 'shim/**', 'wine-wbemprox/patches/**') }}
       - name: Build pinned Windows compatibility payloads
         if: steps.payload-cache.outputs.cache-hit != 'true'
         run: python3 installers/build_runtime.py payloads --output installers/payloads
