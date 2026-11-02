@@ -80,4 +80,5 @@ installers/bridge_setup/__pycache__/
 
 # Python caches at any source depth are local build products.
 **/__pycache__/
+backend/nfq-verdict-test
 *.pyc

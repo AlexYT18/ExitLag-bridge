@@ -89,6 +89,7 @@ if [[ "$tier" == unit || "$tier" == system || "$tier" == live || "$tier" == all 
     run_test "helper builds"          none make -B -C "$repo_root/backend"
     run_test "TCP socket attribution" none make -B -C "$repo_root/backend" check-tcp-attribution
     run_test "process birth identity" none make -B -C "$repo_root/backend" check-process-identity
+    run_test "NFQUEUE verdict encoding" none make -B -C "$repo_root/backend" check-nfq-verdict
     run_test "shim socket attribution" none bash "$repo_root/tests/test-shim-attribution.sh"
     run_test "shim PID domains"       none bash "$repo_root/tests/test-shim-pid-domain.sh"
     run_test "nfapi ABI matches ExitLag" installed "$repo_root/tools/check-exitlag-abi.sh"
@@ -111,6 +112,7 @@ if [[ "$tier" == system || "$tier" == system-only || "$tier" == live || "$tier" 
     run_test "lifecycle hardening"    isolated "$repo_root/tests/harden-runtime-test.sh"
     run_test "IPv6 active rewrite"    isolated "$repo_root/tests/ipv6-redirect-test.sh"
     run_test "TCP synthetic redirect" isolated python3 "$repo_root/tests/test-tcp-redirect.py"
+    run_test "TCP stale-map authorization" isolated python3 "$repo_root/tests/test-tcp-authorization.py"
     run_test "UDP synthetic observe"  isolated python3 "$repo_root/tests/test-udp-observe.py"
     run_test "UDP synthetic steer"    isolated python3 "$repo_root/tests/test-udp-observe.py" --steer
 fi

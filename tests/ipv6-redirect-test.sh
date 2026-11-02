@@ -136,7 +136,9 @@ QUEUE_NUM=0 TEST_DEST="$dest" "$repo_root/backend/nft-setup.sh" >/dev/null 2>&1 
 echo "=== IPv6 map installed? ==="
 nft list map inet exitlag tcp_redirect_v6 >/dev/null 2>&1 \
     && ok "tcp_redirect_v6 map exists" || bad "tcp_redirect_v6 map exists" "missing"
-nft list chain inet exitlag output_nat 2>/dev/null | grep -q 'tcp_redirect_v6' \
+nft list chain inet exitlag output_nat 2>/dev/null | grep -q 'jump tcp_authorized_nat' \
+    && ok "NAT dispatch enters the authorized chain" || bad "authorized NAT dispatch" "missing"
+nft list chain inet exitlag tcp_authorized_nat 2>/dev/null | grep -q 'tcp_redirect_v6' \
     && ok "IPv6 dnat rule present" || bad "IPv6 dnat rule present" "missing"
 
 echo; echo "=== real IPv6 connection through the production path ==="

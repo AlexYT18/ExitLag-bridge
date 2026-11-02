@@ -6,12 +6,14 @@
  * to run ExitLag's real tcpConnectRequest callback. Observation-only is the
  * default. With --apply-tcp, a valid IPv4 destination mutation is installed as
  * one exact, short-lived 4-tuple -> address:port nftables map element before the
- * queued SYN is accepted. The later output NAT chain then applies that result
- * and conntrack owns the rest of the flow.
+ * queued SYN is accepted with a one-packet priority authorization. The later
+ * output NAT chain consumes it before applying DNAT. A stale map entry cannot
+ * authorize a different packet; conntrack owns already translated flows.
  *
  * Design constraints honoured:
  *   - fail open: any error, timeout, missing shim or malformed reply results in
- *     NF_ACCEPT. Losing the helper must never black-hole host networking.
+ *     NF_ACCEPT without new DNAT authorization. This does not revoke an
+ *     existing conntrack translation if its proxy subsequently disappears.
  *   - no persistent firewall state: rules live in a dedicated `inet exitlag`
  *     table installed/removed by backend/nft-setup.sh and nft-teardown.sh.
  *   - NFQUEUE is bound with a bounded queue and the kernel rules use
@@ -51,6 +53,7 @@
 #include "ipc_transport.h"
 #include "tcp_attribution.h"
 #include "process_identity.h"
+#include "nfq_verdict.h"
 
 /*
  * Wine hands the socket fd to the application only after wineserver has created
@@ -1337,20 +1340,23 @@ static void udp_reap_endpoints(void)
     }
 }
 
-static void send_verdict(int queue_num, unsigned int packet_id, unsigned int verdict)
+static void send_verdict_priority(int queue_num, unsigned int packet_id,
+                                  unsigned int verdict, const uint32_t *priority)
 {
     char buf[MNL_SOCKET_BUFFER_SIZE];
-    struct nlmsghdr *nlh = mnl_nlmsg_put_header(buf);
-    nlh->nlmsg_type = (NFNL_SUBSYS_QUEUE << 8) | NFQNL_MSG_VERDICT;
-    nlh->nlmsg_flags = NLM_F_REQUEST;
-    struct nfgenmsg *nfg = mnl_nlmsg_put_extra_header(nlh, sizeof(*nfg));
-    nfg->nfgen_family = AF_UNSPEC;
-    nfg->version = NFNETLINK_V0;
-    nfg->res_id = htons((uint16_t)queue_num);
-    struct nfqnl_msg_verdict_hdr vh = { htonl(verdict), htonl(packet_id) };
-    mnl_attr_put(nlh, NFQA_VERDICT_HDR, sizeof(vh), &vh);
-    if (mnl_socket_sendto(g_nl, nlh, nlh->nlmsg_len) < 0)
+    size_t length = nfq_verdict_build(buf, sizeof(buf), (uint16_t)queue_num,
+                                    packet_id, verdict, priority);
+    if (!length) {
+        log_line("verdict construction failed");
+        return;
+    }
+    if (mnl_socket_sendto(g_nl, buf, length) < 0)
         log_line("verdict send failed: %s", strerror(errno));
+}
+
+static void send_verdict(int queue_num, unsigned int packet_id, unsigned int verdict)
+{
+    send_verdict_priority(queue_num, packet_id, verdict, NULL);
 }
 
 static uint32_t checksum_add(uint32_t sum, const unsigned char *data, size_t length)
@@ -1583,7 +1589,9 @@ static void observe_udp_packet(int queue_num, unsigned int packet_id, int family
  *
  * A trusted absolute nft path is invoked directly (never through a shell), and every token in
  * the command is produced by inet_ntop or an integer conversion. A failed map
- * update is a fail-open condition: the caller accepts the original SYN.
+ * update is a fail-open condition: the caller supplies no packet authorization.
+ * A successful update alone is insufficient: the current verdict must also
+ * carry the transient priority bit consumed by output_nat.
  */
 /*
  * Install one exact 4-tuple DNAT element. The only difference between families
@@ -1707,6 +1715,16 @@ static int on_packet(const struct nlmsghdr *nlh, void *data)
     const struct tcphdr *tcp = (const struct tcphdr *)l4;
     if (!tcp->syn || tcp->ack) {          /* only the first SYN starts a flow */
         send_verdict(queue_num, packet_id, NF_ACCEPT);
+        return MNL_CB_OK;
+    }
+
+    uint32_t packet_priority = 0;
+    if (!nfq_priority_read(tb[NFQA_PRIORITY], &packet_priority) ||
+        (packet_priority & EXL_TCP_AUTH_PRIORITY)) {
+        /* The owned queue chain clears this bit before enqueueing. Never
+           authorize an unverified priority attribute or foreign queue path. */
+        packet_priority &= ~EXL_TCP_AUTH_PRIORITY;
+        send_verdict_priority(queue_num, packet_id, NF_ACCEPT, &packet_priority);
         return MNL_CB_OK;
     }
 
@@ -1888,7 +1906,12 @@ static int on_packet(const struct nlmsghdr *nlh, void *data)
                  flow_index, since_ms, from, to, (unsigned)ntohs(tcp->dest), linux_pid, exe[0] ? exe : "?");
     }
 
-    send_verdict(queue_num, packet_id, NF_ACCEPT);
+    if (redirect_armed) {
+        uint32_t authorized_priority = packet_priority | EXL_TCP_AUTH_PRIORITY;
+        send_verdict_priority(queue_num, packet_id, NF_ACCEPT, &authorized_priority);
+    } else {
+        send_verdict(queue_num, packet_id, NF_ACCEPT);
+    }
     return MNL_CB_OK;
 }
 

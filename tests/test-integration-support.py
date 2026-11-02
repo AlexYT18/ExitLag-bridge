@@ -115,7 +115,7 @@ class HarnessSafetyTests(unittest.TestCase):
         return module
 
     def test_import_has_no_execution_and_missing_isolation_prevents_startup(self):
-        for filename in ('test-tcp-redirect.py', 'test-udp-observe.py'):
+        for filename in ('test-tcp-redirect.py', 'test-tcp-authorization.py', 'test-udp-observe.py'):
             with self.subTest(harness=filename):
                 module = self.load_harness(filename)
                 with mock.patch.object(module, 'require_isolation',

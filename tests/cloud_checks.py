@@ -125,6 +125,7 @@ def main():
     cxx = shlex.split(os.environ.get("CXX", "c++"))
     compiler = cc[0] if cc else "cc"
     checks.run("Native IPC transport", ["make", "-B", "-C", "backend", "check-ipc"], needs=("make", compiler))
+    checks.run("Native NFQUEUE verdict encoding", ["make", "-B", "-C", "backend", "check-nfq-verdict"], needs=("make", compiler))
     checks.run("Shim IPC validation", ["bash", "tests/test-shim-validation.sh"], needs=("bash", cxx[0] if cxx else "c++"))
     helper = checks.run("Fresh backend build", ["make", "-B", "-C", "backend"], needs=("make", compiler))
     try:
@@ -152,10 +153,10 @@ def main():
     checks.run("Cppcheck native backend", ["cppcheck", "--check-level=exhaustive",
                "--enable=warning,performance,portability", "--error-exitcode=1", "--std=c11",
                "--suppress=missingIncludeSystem", "backend/exitlag-netd.c", "backend/ipc_transport.c",
-               "backend/tcp_attribution.c", "backend/process_identity.c"], needs=("cppcheck",))
+               "backend/tcp_attribution.c", "backend/process_identity.c", "backend/nfq_verdict.c"], needs=("cppcheck",))
     if shutil.which(compiler) and Path(compiler).name in ("gcc", "cc"):
         checks.run("GCC static analyzer IPC", [*cc, "-Wall", "-Wextra", "-Werror", "-fanalyzer", "-c", "backend/ipc_transport.c", "-o", str(checks.output / "ipc-analyzer.o")])
-        for module in ("tcp_attribution", "process_identity"):
+        for module in ("tcp_attribution", "process_identity", "nfq_verdict"):
             checks.run("GCC static analyzer " + module, [*cc, "-Wall", "-Wextra", "-Werror", "-fanalyzer", "-c", "backend/" + module + ".c", "-o", str(checks.output / (module + "-analyzer.o"))])
     else:
         checks.record("GCC static analyzer IPC", "SKIP", "requires GCC -fanalyzer")
@@ -165,6 +166,7 @@ def main():
         sanitizer_env = dict(os.environ)
         sanitizer_env["UBSAN_OPTIONS"] = "halt_on_error=1:print_stacktrace=1"
         checks.run("ASan UBSan native IPC transport", ["make", "-B", "-C", "backend", "check-ipc", "CFLAGS=" + flags, "LDFLAGS=" + links], needs=("make", compiler), env=sanitizer_env)
+        checks.run("ASan UBSan NFQUEUE verdict encoding", ["make", "-B", "-C", "backend", "check-nfq-verdict", "CFLAGS=" + flags, "LDFLAGS=" + links], needs=("make", compiler), env=sanitizer_env)
         checks.run("ASan UBSan shim IPC validation", ["bash", "tests/test-shim-validation.sh", "--sanitize"], needs=("bash", cxx[0] if cxx else "c++"), env=sanitizer_env)
         for target, name in (("check-tcp-attribution", "TCP attribution"), ("check-process-identity", "process identity")):
             checks.run("ASan UBSan native " + name, ["make", "-B", "-C", "backend", target, "CFLAGS=" + flags, "LDFLAGS=" + links], needs=("make", compiler), env=sanitizer_env, reason=loopback_reason)
