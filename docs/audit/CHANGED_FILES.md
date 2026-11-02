@@ -1,8 +1,8 @@
 # Changed files
 
-Baseline audit: `c0525a74c35fd74c815326d957c21a593a6aaccb`. This inventory was captured before the later authorized publication commits. Includes reviewable synthetic evidence; generated binaries and private runtime state excluded.
+Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication diff base: `dfdd0ee43e2edb850fec31621e8feffa3dea2715` in the user fork. Includes synthetic validation evidence; excludes generated binaries/private runtime.
 
-38 existing files modified; 89 new files, including audit documents/evidence.
+38 existing files changed; 92 files added.
 
 | Status | File |
 | --- | --- |
@@ -84,6 +84,9 @@ Baseline audit: `c0525a74c35fd74c815326d957c21a593a6aaccb`. This inventory was c
 | Added | `docs/audit/evidence/arch-l1.json` |
 | Added | `docs/audit/evidence/arch-macOS_account_free_units.txt` |
 | Added | `docs/audit/evidence/arch-multiuid.txt` |
+| Added | `docs/audit/evidence/arch-publish-l1.json` |
+| Added | `docs/audit/evidence/arch-publish-macos-units.txt` |
+| Added | `docs/audit/evidence/arch-publish-summary.txt` |
 | Added | `docs/audit/evidence/arch-rpc_surface_test_sh.txt` |
 | Added | `docs/audit/evidence/arch-test_benchmark_ipc_py.txt` |
 | Added | `docs/audit/evidence/arch-test_discovery_filters_py.txt` |
