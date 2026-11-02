@@ -134,6 +134,10 @@ def main():
     except OSError as error:
         loopback_reason = "loopback socket bind unavailable: " + str(error)
     helper_reason = "fresh backend build did not pass" if helper != "PASS" else loopback_reason
+    checks.run("Native TCP attribution", ["make", "-B", "-C", "backend", "check-tcp-attribution"], needs=("make", compiler), reason=loopback_reason)
+    checks.run("Native process identity", ["make", "-B", "-C", "backend", "check-process-identity"], needs=("make", compiler), reason=loopback_reason)
+    checks.run("Shim socket attribution", ["bash", "tests/test-shim-attribution.sh"], needs=("bash", cxx[0] if cxx else "c++"))
+    checks.run("Shim PID domains", ["bash", "tests/test-shim-pid-domain.sh"], needs=("bash", cxx[0] if cxx else "c++"))
     checks.run("Authenticated backend IPC", [sys.executable, "tests/test_backend_ipc.py", "-v"], reason=helper_reason, unit_test=True)
     for filename in ("test-identity-map.sh", "rpc-surface-test.sh", "identity-assistant-test.sh"):
         checks.run(filename, ["bash", "tests/" + filename], needs=("bash",), reason=helper_reason)
@@ -147,9 +151,12 @@ def main():
     checks.run("ShellCheck runner scripts", ["shellcheck", "tests/run-cloud.sh", "tests/run-all.sh", "tests/run-isolated.sh"], needs=("shellcheck",))
     checks.run("Cppcheck native backend", ["cppcheck", "--check-level=exhaustive",
                "--enable=warning,performance,portability", "--error-exitcode=1", "--std=c11",
-               "--suppress=missingIncludeSystem", "backend/exitlag-netd.c", "backend/ipc_transport.c"], needs=("cppcheck",))
+               "--suppress=missingIncludeSystem", "backend/exitlag-netd.c", "backend/ipc_transport.c",
+               "backend/tcp_attribution.c", "backend/process_identity.c"], needs=("cppcheck",))
     if shutil.which(compiler) and Path(compiler).name in ("gcc", "cc"):
         checks.run("GCC static analyzer IPC", [*cc, "-Wall", "-Wextra", "-Werror", "-fanalyzer", "-c", "backend/ipc_transport.c", "-o", str(checks.output / "ipc-analyzer.o")])
+        for module in ("tcp_attribution", "process_identity"):
+            checks.run("GCC static analyzer " + module, [*cc, "-Wall", "-Wextra", "-Werror", "-fanalyzer", "-c", "backend/" + module + ".c", "-o", str(checks.output / (module + "-analyzer.o"))])
     else:
         checks.record("GCC static analyzer IPC", "SKIP", "requires GCC -fanalyzer")
     if args.sanitizers:
@@ -159,6 +166,10 @@ def main():
         sanitizer_env["UBSAN_OPTIONS"] = "halt_on_error=1:print_stacktrace=1"
         checks.run("ASan UBSan native IPC transport", ["make", "-B", "-C", "backend", "check-ipc", "CFLAGS=" + flags, "LDFLAGS=" + links], needs=("make", compiler), env=sanitizer_env)
         checks.run("ASan UBSan shim IPC validation", ["bash", "tests/test-shim-validation.sh", "--sanitize"], needs=("bash", cxx[0] if cxx else "c++"), env=sanitizer_env)
+        for target, name in (("check-tcp-attribution", "TCP attribution"), ("check-process-identity", "process identity")):
+            checks.run("ASan UBSan native " + name, ["make", "-B", "-C", "backend", target, "CFLAGS=" + flags, "LDFLAGS=" + links], needs=("make", compiler), env=sanitizer_env, reason=loopback_reason)
+        checks.run("ASan UBSan shim socket attribution", ["bash", "tests/test-shim-attribution.sh", "--sanitize"], needs=("bash", cxx[0] if cxx else "c++"), env=sanitizer_env)
+        checks.run("ASan UBSan shim PID domains", ["bash", "tests/test-shim-pid-domain.sh", "--sanitize"], needs=("bash", cxx[0] if cxx else "c++"), env=sanitizer_env)
         sanitized = checks.run("ASan UBSan fresh backend", ["make", "-B", "-C", "backend", "CFLAGS=" + flags, "LDFLAGS=" + links], needs=("make", compiler), env=sanitizer_env)
         checks.run("ASan UBSan authenticated backend IPC", [sys.executable, "tests/test_backend_ipc.py", "-v"], env=sanitizer_env,
                    reason="sanitized build did not pass" if sanitized != "PASS" else loopback_reason, unit_test=True)

@@ -1,8 +1,8 @@
 # Changed files
 
-Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication diff base: `dfdd0ee43e2edb850fec31621e8feffa3dea2715` in the user fork. Includes synthetic validation evidence; excludes generated binaries/private runtime.
+Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `dfdd0ee43e2edb850fec31621e8feffa3dea2715`. Includes the TCP attribution iteration and synthetic evidence; generated binaries/private runtime excluded.
 
-39 existing files changed; 92 files added.
+39 existing files changed; 111 files added.
 
 | Status | File |
 | --- | --- |
@@ -49,6 +49,10 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication diff bas
 | Added | `ARCH_RESULT.md` |
 | Added | `backend/ipc_transport.c` |
 | Added | `backend/ipc_transport.h` |
+| Added | `backend/process_identity.c` |
+| Added | `backend/process_identity.h` |
+| Added | `backend/tcp_attribution.c` |
+| Added | `backend/tcp_attribution.h` |
 | Added | `docs/audit/BASELINE_TESTING.md` |
 | Added | `docs/audit/CHANGED_FILES.md` |
 | Added | `docs/audit/FILE_INVENTORY.md` |
@@ -56,6 +60,7 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication diff bas
 | Added | `docs/audit/ITERATION_REPORT.md` |
 | Added | `docs/audit/ROADMAP.md` |
 | Added | `docs/audit/SOURCE_HASHES.json` |
+| Added | `docs/audit/TCP_ATTRIBUTION_ITERATION.md` |
 | Added | `docs/audit/evidence/IPC_hostile_input.txt` |
 | Added | `docs/audit/evidence/IPv6_active_rewrite.txt` |
 | Added | `docs/audit/evidence/TCP_synthetic_redirect.txt` |
@@ -111,6 +116,10 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication diff bas
 | Added | `docs/audit/evidence/legacy-unit-summary.txt` |
 | Added | `docs/audit/evidence/lifecycle_hardening.txt` |
 | Added | `docs/audit/evidence/pe-exports.json` |
+| Added | `docs/audit/evidence/tcp-iteration-cloud.json` |
+| Added | `docs/audit/evidence/tcp-iteration-cloud.txt` |
+| Added | `docs/audit/evidence/tcp-iteration-concurrent.txt` |
+| Added | `docs/audit/evidence/tcp-iteration-isolated.txt` |
 | Added | `docs/audit/evidence/working-tree-privacy.json` |
 | Added | `docs/audit/notes/BACKEND.md` |
 | Added | `docs/audit/notes/BACKEND_IMPLEMENTATION.md` |
@@ -122,13 +131,23 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication diff bas
 | Added | `docs/audit/notes/TESTS_CI.md` |
 | Added | `shim/llvm-toolchain.sh` |
 | Added | `shim/nfapi/ipc_validation.h` |
+| Added | `shim/nfapi/pid_domain.h` |
+| Added | `shim/nfapi/socket_attribution.h` |
+| Added | `shim/nfapi/tcp_callback_policy.h` |
 | Added | `tests/benchmark-ipc.py` |
 | Added | `tests/cloud_checks.py` |
 | Added | `tests/integration_support.py` |
 | Added | `tests/ipc-transport-test.c` |
+| Added | `tests/process-identity-test.c` |
 | Added | `tests/run-cloud.sh` |
 | Added | `tests/run-isolated.sh` |
+| Added | `tests/tcp-attribution-client.py` |
+| Added | `tests/tcp-attribution-test.c` |
 | Added | `tests/test-integration-support.py` |
+| Added | `tests/test-shim-attribution.cpp` |
+| Added | `tests/test-shim-attribution.sh` |
+| Added | `tests/test-shim-pid-domain.cpp` |
+| Added | `tests/test-shim-pid-domain.sh` |
 | Added | `tests/test-shim-validation.cpp` |
 | Added | `tests/test-shim-validation.sh` |
 | Added | `tests/test_backend_ipc.py` |

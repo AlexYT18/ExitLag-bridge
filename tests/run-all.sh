@@ -87,6 +87,10 @@ if [[ "$tier" == unit || "$tier" == system || "$tier" == live || "$tier" == all 
     echo; echo "===== unit ====="
     run_test "shim builds"            none "$repo_root/shim/nfapi/build.sh"
     run_test "helper builds"          none make -B -C "$repo_root/backend"
+    run_test "TCP socket attribution" none make -B -C "$repo_root/backend" check-tcp-attribution
+    run_test "process birth identity" none make -B -C "$repo_root/backend" check-process-identity
+    run_test "shim socket attribution" none bash "$repo_root/tests/test-shim-attribution.sh"
+    run_test "shim PID domains"       none bash "$repo_root/tests/test-shim-pid-domain.sh"
     run_test "nfapi ABI matches ExitLag" installed "$repo_root/tools/check-exitlag-abi.sh"
     run_test "identity map pos/neg"   none "$repo_root/tests/test-identity-map.sh"
     run_test "crash-guard build only"  none "$repo_root/tests/build-nfapi-compat-smoketest.sh"
