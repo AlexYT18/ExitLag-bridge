@@ -3,6 +3,12 @@
 An ExitLag dashboard entry does not prove traffic is being relayed. Keep user
 reports, automated tests and observed game connections distinct.
 
+Client versions are a separate compatibility boundary. The
+[5.24.0 review](exitlag-updates.md#client-5240-review--2026-11-02) records static
+import checks and fresh-prefix configuration on macOS. Login and live routing
+with 5.24.0 remain untested; the earlier game results below are not new-version
+certification.
+
 | Game | Platform | Recorded result | Tested scope |
 |---|---|---|---|
 | World of Warcraft Classic Era | **Arch Linux, x86_64** | Working — maintainer verified | Real gameplay on Arch Linux with the original bridge. |

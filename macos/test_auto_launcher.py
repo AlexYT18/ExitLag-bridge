@@ -1,7 +1,9 @@
 """Automatic launcher boundaries and actual loopback companion reloading."""
+import contextlib
 import os
 from pathlib import Path
 import secrets
+import socket
 import tempfile
 import threading
 import time
@@ -96,6 +98,22 @@ class ReloadingFlows(unittest.TestCase):
     tearDown = test_bridge.BridgeTests.tearDown
     exchange = test_bridge.BridgeTests.exchange
 
+    @contextlib.contextmanager
+    def companion(self, pid, token, port=51902):
+        # Keep the real configuration-port checks, but send test connections
+        # to an ephemeral listener so a running game companion is untouched.
+        server = AdapterServer(pid, token)
+        connect = socket.create_connection
+        def isolated(address, *args, **kwargs):
+            if address == ('127.0.0.1', port):
+                address = ('127.0.0.1', server.port)
+            return connect(address, *args, **kwargs)
+        try:
+            with mock.patch('wine_socket.socket.create_connection', side_effect=isolated):
+                yield server
+        finally:
+            server.close()
+
     def test_new_companion_is_loaded_after_game_restart(self):
         with tempfile.TemporaryDirectory() as folder:
             config = Path(folder) / 'companion.json'
@@ -103,12 +121,9 @@ class ReloadingFlows(unittest.TestCase):
             self.shim = test_bridge.Shim(self.service, self.routed.endpoint)
             for pid in (4321, 5678):
                 token = secrets.token_bytes(32)
-                server = AdapterServer(pid, token, 51902)
-                try:
+                with self.companion(pid, token):
                     c.atomic_private(config, dict(version=1, pid=pid, port=51902, identity=self.identity, token=token.hex()))
                     self.assertEqual(self.exchange(), b'exitlag:hello')
-                finally:
-                    server.close()
                 time.sleep(.3)
             self.assertEqual(self.service.snapshot()['redirected'], 2)
 
@@ -119,15 +134,12 @@ class ReloadingFlows(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             config = Path(folder) / 'forever.json'
             token = secrets.token_bytes(32)
-            server = AdapterServer(9999, token, 51903)
-            try:
+            with self.companion(9999, token, 51903):
                 c.atomic_private(config, dict(version=1, pid=9999, port=51903, identity=forever, token=token.hex()))
                 self.service.socket_adapter = ReloadingWineSocketAdapter({forever: (config, 51903)}, os.getuid(), [forever])
                 self.shim = test_bridge.Shim(self.service, self.routed.endpoint, nested=True)
                 self.assertEqual(self.exchange(), b'exitlag:hello')
                 self.assertEqual(self.shim.resolved, [forever, ''])
-            finally:
-                server.close()
 
     def test_missing_companion_falls_back_to_the_original_destination(self):
         self.service.socket_adapter = ReloadingWineSocketAdapter(Path('/nonexistent/config'), os.getuid(), [self.identity], wait=.1)
@@ -140,8 +152,7 @@ class ReloadingFlows(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             config = Path(folder) / 'companion.json'
             token = secrets.token_bytes(32)
-            server = AdapterServer(4321, token, 51902)
-            try:
+            with self.companion(4321, token):
                 def later():
                     time.sleep(.15)
                     c.atomic_private(config, dict(version=1, pid=4321, port=51902, identity=self.identity, token=token.hex()))
@@ -151,8 +162,6 @@ class ReloadingFlows(unittest.TestCase):
                 self.shim = test_bridge.Shim(self.service, self.routed.endpoint)
                 self.assertEqual(self.exchange(), b'exitlag:hello')
                 thread.join()
-            finally:
-                server.close()
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

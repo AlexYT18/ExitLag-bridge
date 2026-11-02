@@ -5,6 +5,44 @@ reproduces a private ABI (`nfapi`) against a specific build, so an update can
 change what the client expects without any visible symptom until it crashes or
 silently stops being steered.
 
+## Client 5.24.0 review — 2026-11-02
+
+The [official download page](https://www.exitlag.com/download) now links to
+`SetupExitLag-5.24.0-x64.exe`. Its AMD64 application payload was checked against
+the released Mac shim and Wine 11.17 Staging in a separate, account-free prefix.
+
+| Check | Result |
+|---|---|
+| Main application's `nfapi` imports | The same 18 symbols as client 5.23.3; none added or removed. |
+| Driver-registration helper's `nfapi` imports | Two symbols; all 20 symbols required across both modules are provided by the shim. |
+| Main application's Wine imports | 18 system DLLs checked; all 11 absent named exports have existing crash guards, and 31 ordinal imports resolve. |
+| Fresh-prefix WMI and shim configuration | Passed using the existing compatibility components. |
+| Account-free process startup | Stayed running for 45 seconds with Vulkan/basic Qt rendering; no sign-in or game traffic. This was a process-liveness check, not visual dashboard verification. |
+| Login and live game routing | Not tested with 5.24.0; earlier gameplay results do not establish this version's behavior. |
+
+No shim change was required by these import checks. They do not verify callback
+behavior, authentication, route analysis, or a complete game session. Linux
+runtime testing with 5.24.0 remains outstanding. Keep the client version in new
+compatibility reports.
+
+The review used extracted AMD64 files rather than completing the graphical
+vendor installer. The installer contains both AMD64 and ARM64 runtime variants;
+an extraction must preserve collisions and select the AMD64 files. Normal users
+should continue through the official wizard described in the setup guide.
+
+Public download identities, for reproducing this review:
+
+```text
+SetupExitLag-5.24.0-x64.exe SHA-256:
+8e1482aa23169ee442e368fad1ad0c5767d20ce596ab8129b7e4cce24d18dc86
+ExitLag.exe SHA-256:
+9baa794c84c5a90f1b2c84130877ba8ae5a8b1867ece00866dd3b03d0eccc106
+```
+
+These hashes identify the downloaded files; they are not a replacement for
+publisher-signature verification. No vendor binaries, account state, or raw
+runtime logs are included in this repository.
+
 **The updater is not disabled.** Blocking it would leave users on an old client
 against a live service, and ExitLag's own auth and relay code is the part we
 deliberately do not touch. Instead, updates are detected and verified.
@@ -56,17 +94,18 @@ This is why a bare hash pin would be wrong: the hash changes on every update,
 while the ABI usually does not. Checking the ABI lets a routine update through
 and stops a breaking one.
 
-Current state of the installed build:
+Example report for the main executable (the setup check also examines the
+registration helper):
 
 ```text
 == nfapi ABI ==
   ExitLag imports : 18 symbols
-  shim exports    : 18 symbols
+  shim exports    : 20 symbols
   OK: the shim provides every nfapi symbol this build imports
 
 == Wine missing-import crash guards ==
   OK: every import Wine does not provide is covered by a crash guard
-      (16 DLLs checked, 11 guards installed)
+      (18 DLLs checked, 11 guards installed)
 ```
 
 ## What is not checked automatically
