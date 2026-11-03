@@ -94,43 +94,12 @@ class Desktop:
             State(self.state, create=True)
         except (OSError, ValueError) as error:
             messagebox.showerror('Setup directory', str(error)); return
-        dialog = tk.Toplevel(self.window); dialog.title('Game mappings'); dialog.geometry('680x400')
-        ttk.Label(dialog, text='Executable mappings: game path, a Tab, then its Windows executable identity.\nWine-prefix mappings also require a third Tab column: the actual Wine/Proton loader executable. They authorize that loader in the whole prefix; separate game prefixes are preferable.', wraplength=640).pack(padx=16, pady=12, anchor='w')
-        editor = tk.Text(dialog, wrap='none', height=12); editor.pack(padx=16, fill='both', expand=True)
-        path = self.state / 'games.map'
-        if path.exists():
-            editor.insert('1.0', path.read_text())
-        def add(prefix=False):
-            selected = filedialog.askdirectory(title='Game Wine prefix') if prefix else filedialog.askopenfilename(title='Game executable')
-            if selected:
-                loader = None
-                if prefix:
-                    loader = filedialog.askopenfilename(title='Actual Wine/Proton loader executable that owns the game socket')
-                    if not loader:
-                        return
-                identity = simpledialog.askstring('Windows game identity', 'Windows executable path recognized by ExitLag (for example C:\\Games\\World of Warcraft\\_classic_era_\\WowClassic.exe):', parent=dialog)
-                if identity:
-                    source = ('wineprefix:' if prefix else '') + str(Path(selected).resolve())
-                    owner = '\t' + str(Path(loader).resolve()) if loader else ''
-                    editor.insert('end', source + '\t' + identity + owner + '\n')
-        def save():
-            text = editor.get('1.0', 'end').strip() + '\n'
-            # Same parser used by the installed supervisor, running unprivileged here.
-            sys.path.insert(0, str(Path(__file__).parent))
-            from run_root import read_map
-            temporary = self.state / 'games.draft.map'
-            fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
-            with os.fdopen(fd, 'w') as output: output.write(text)
-            try:
-                read_map(temporary, os.getuid())
-                os.replace(temporary, path)
-                dialog.destroy()
-            except Exception as error:
-                messagebox.showerror('Game mappings', str(error), parent=dialog)
-                temporary.unlink(missing_ok=True)
-        controls = ttk.Frame(dialog); controls.pack(padx=16, pady=12, anchor='w')
-        for label, command in [('Add executable…', lambda: add()), ('Add Wine prefix…', lambda: add(True)), ('Save', save)]:
-            ttk.Button(controls, text=label, command=command).pack(side='left', padx=(0, 8))
+        sys.path.insert(0, str(Path(__file__).parent))
+        from game_picker import open_editor
+        try:
+            return open_editor(self.window, self.state / 'games.map', ROOT)
+        except (OSError, ValueError) as error:
+            messagebox.showerror('Game settings', str(error), parent=self.window)
 
     def launch(self):
         if self.busy or self.helper:
