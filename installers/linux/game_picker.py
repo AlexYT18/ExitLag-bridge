@@ -285,8 +285,12 @@ class RunningGameDialog:
             self.timer = self.window.after(50, self.poll)
 
     def _submit(self, kind, operation, callback):
-        try: self.tasks.submit(kind, operation, callback)
-        except (ValueError, RuntimeError) as error: self.status.set(str(error))
+        try:
+            self.tasks.submit(kind, operation, callback)
+            return True
+        except (ValueError, RuntimeError) as error:
+            self.status.set(str(error))
+            return False
 
     def refresh(self):
         self.selected = self.manual_identity = None
@@ -300,7 +304,8 @@ class RunningGameDialog:
                 self.candidates = []; self.render(); self.status.set(str(error))
             else:
                 self.candidates = items; self.render()
-        self._submit('scan', self.picker.list_candidates, done)
+        if not self._submit('scan', self.picker.list_candidates, done):
+            self.refresh_button.state(['!disabled'])
 
     def render(self):
         previous = self.process_tree.selection()

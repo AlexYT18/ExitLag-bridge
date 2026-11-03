@@ -76,6 +76,7 @@ python3 tests/gui-picker-smoke.py
 
 Последний тест запускает настоящий Tk в отдельном Xvfb с synthetic process
 provider. При отсутствии Xvfb он возвращает SKIP 77. Для Arch нужен пакет
-`xorg-server-xvfb`. Аккаунт, коммерческий клиент и игра этим тестам не нужны.
+`xorg-server-xvfb` и установленный шрифт, например `ttf-dejavu`. Аккаунт,
+коммерческий клиент и игра этим тестам не нужны.
 Результаты и ограничения конкретной итерации —
 [PROCESS_PICKER_ITERATION.md](audit/PROCESS_PICKER_ITERATION.md).

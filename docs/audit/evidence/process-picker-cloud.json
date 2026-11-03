@@ -72,7 +72,7 @@
       ],
       "exit_code": 0,
       "seconds": 0.115,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Shell_syntax.log"
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Shell_syntax.log"
     },
     {
       "name": "ShellCheck source errors",
@@ -132,8 +132,8 @@
         "wine-wbemprox/build-local.sh"
       ],
       "exit_code": 0,
-      "seconds": 2.929,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/ShellCheck_source_errors.log"
+      "seconds": 3.024,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/ShellCheck_source_errors.log"
     },
     {
       "name": "test_discovery_filters.py",
@@ -143,8 +143,8 @@
         "tests/test_discovery_filters.py"
       ],
       "exit_code": 0,
-      "seconds": 0.115,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/test_discovery_filters_py.log",
+      "seconds": 0.165,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/test_discovery_filters_py.log",
       "test_methods": 3
     },
     {
@@ -156,7 +156,7 @@
       ],
       "exit_code": 0,
       "seconds": 0.165,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/test_identity_tools_py.log",
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/test_identity_tools_py.log",
       "test_methods": 11
     },
     {
@@ -168,7 +168,7 @@
       ],
       "exit_code": 0,
       "seconds": 0.215,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/test_installer_py.log",
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/test_installer_py.log",
       "test_methods": 13
     },
     {
@@ -179,8 +179,8 @@
         "tests/test_linux_desktop.py"
       ],
       "exit_code": 0,
-      "seconds": 0.165,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/test_linux_desktop_py.log",
+      "seconds": 0.167,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/test_linux_desktop_py.log",
       "test_methods": 11
     },
     {
@@ -192,7 +192,7 @@
       ],
       "exit_code": 0,
       "seconds": 0.165,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/test_linux_launcher_py.log",
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/test_linux_launcher_py.log",
       "test_methods": 5
     },
     {
@@ -203,8 +203,8 @@
         "tests/test_mac_distribution.py"
       ],
       "exit_code": 0,
-      "seconds": 0.114,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/test_mac_distribution_py.log",
+      "seconds": 0.164,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/test_mac_distribution_py.log",
       "test_methods": 4
     },
     {
@@ -216,7 +216,7 @@
       ],
       "exit_code": 0,
       "seconds": 0.215,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/test_process_picker_py.log",
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/test_process_picker_py.log",
       "test_methods": 39
     },
     {
@@ -227,8 +227,8 @@
         "tests/test_game_picker.py"
       ],
       "exit_code": 0,
-      "seconds": 0.215,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/test_game_picker_py.log",
+      "seconds": 0.216,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/test_game_picker_py.log",
       "test_methods": 26
     },
     {
@@ -240,7 +240,7 @@
       ],
       "exit_code": 0,
       "seconds": 0.215,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/test_linux_packaging_py.log",
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/test_linux_packaging_py.log",
       "test_methods": 8
     },
     {
@@ -251,8 +251,8 @@
         "tests/test_source_audit.py"
       ],
       "exit_code": 0,
-      "seconds": 0.165,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/test_source_audit_py.log",
+      "seconds": 0.166,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/test_source_audit_py.log",
       "test_methods": 4
     },
     {
@@ -263,8 +263,8 @@
         "tests/test_runner.py"
       ],
       "exit_code": 0,
-      "seconds": 0.268,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/test_runner_py.log",
+      "seconds": 0.214,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/test_runner_py.log",
       "test_methods": 14
     },
     {
@@ -276,7 +276,7 @@
       ],
       "exit_code": 0,
       "seconds": 0.164,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/test_integration_support_py.log",
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/test_integration_support_py.log",
       "test_methods": 9
     },
     {
@@ -287,8 +287,8 @@
         "tests/test_benchmark_ipc.py"
       ],
       "exit_code": 0,
-      "seconds": 0.164,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/test_benchmark_ipc_py.log",
+      "seconds": 0.165,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/test_benchmark_ipc_py.log",
       "test_methods": 11
     },
     {
@@ -299,8 +299,8 @@
         "tests/test_llvm_toolchain.py"
       ],
       "exit_code": 0,
-      "seconds": 0.114,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/test_llvm_toolchain_py.log",
+      "seconds": 0.115,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/test_llvm_toolchain_py.log",
       "test_methods": 3
     },
     {
@@ -311,9 +311,9 @@
         "tests/gui-picker-smoke.py"
       ],
       "exit_code": 0,
-      "seconds": 1.472,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Tk_process_picker_integration.log",
-      "test_methods": 6
+      "seconds": 1.568,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Tk_process_picker_integration.log",
+      "test_methods": 7
     },
     {
       "name": "macOS account-free units",
@@ -330,8 +330,8 @@
         "-v"
       ],
       "exit_code": 0,
-      "seconds": 4.829,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/macOS_account_free_units.log",
+      "seconds": 4.831,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/macOS_account_free_units.log",
       "test_methods": 36,
       "skipped_methods": 2
     },
@@ -346,8 +346,8 @@
         "check-ipc"
       ],
       "exit_code": 0,
-      "seconds": 0.469,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Native_IPC_transport.log"
+      "seconds": 0.465,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Native_IPC_transport.log"
     },
     {
       "name": "Native NFQUEUE verdict encoding",
@@ -361,7 +361,7 @@
       ],
       "exit_code": 0,
       "seconds": 0.165,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Native_NFQUEUE_verdict_encoding.log"
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Native_NFQUEUE_verdict_encoding.log"
     },
     {
       "name": "Shim IPC validation",
@@ -371,8 +371,8 @@
         "tests/test-shim-validation.sh"
       ],
       "exit_code": 0,
-      "seconds": 0.415,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Shim_IPC_validation.log"
+      "seconds": 0.365,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Shim_IPC_validation.log"
     },
     {
       "name": "Fresh backend build",
@@ -384,8 +384,8 @@
         "backend"
       ],
       "exit_code": 0,
-      "seconds": 0.972,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Fresh_backend_build.log"
+      "seconds": 1.017,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Fresh_backend_build.log"
     },
     {
       "name": "Native TCP attribution",
@@ -398,8 +398,8 @@
         "check-tcp-attribution"
       ],
       "exit_code": 0,
-      "seconds": 0.317,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Native_TCP_attribution.log"
+      "seconds": 0.318,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Native_TCP_attribution.log"
     },
     {
       "name": "Native process identity",
@@ -412,8 +412,8 @@
         "check-process-identity"
       ],
       "exit_code": 0,
-      "seconds": 0.268,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Native_process_identity.log"
+      "seconds": 0.319,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Native_process_identity.log"
     },
     {
       "name": "Shim socket attribution",
@@ -423,8 +423,8 @@
         "tests/test-shim-attribution.sh"
       ],
       "exit_code": 0,
-      "seconds": 0.969,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Shim_socket_attribution.log"
+      "seconds": 0.97,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Shim_socket_attribution.log"
     },
     {
       "name": "Shim PID domains",
@@ -434,8 +434,8 @@
         "tests/test-shim-pid-domain.sh"
       ],
       "exit_code": 0,
-      "seconds": 0.619,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Shim_PID_domains.log"
+      "seconds": 0.566,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Shim_PID_domains.log"
     },
     {
       "name": "Authenticated backend IPC",
@@ -446,8 +446,8 @@
         "-v"
       ],
       "exit_code": 0,
-      "seconds": 3.029,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Authenticated_backend_IPC.log",
+      "seconds": 3.077,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Authenticated_backend_IPC.log",
       "test_methods": 16
     },
     {
@@ -458,8 +458,8 @@
         "tests/test-identity-map.sh"
       ],
       "exit_code": 0,
-      "seconds": 0.168,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/test_identity_map_sh.log"
+      "seconds": 0.164,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/test_identity_map_sh.log"
     },
     {
       "name": "rpc-surface-test.sh",
@@ -469,8 +469,8 @@
         "tests/rpc-surface-test.sh"
       ],
       "exit_code": 0,
-      "seconds": 0.619,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/rpc_surface_test_sh.log"
+      "seconds": 0.567,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/rpc_surface_test_sh.log"
     },
     {
       "name": "identity-assistant-test.sh",
@@ -480,8 +480,8 @@
         "tests/identity-assistant-test.sh"
       ],
       "exit_code": 0,
-      "seconds": 2.026,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/identity_assistant_test_sh.log"
+      "seconds": 2.032,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/identity_assistant_test_sh.log"
     },
     {
       "name": "Process discovery",
@@ -491,8 +491,8 @@
         "tests/discovery-test.sh"
       ],
       "exit_code": 0,
-      "seconds": 3.432,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Process_discovery.log",
+      "seconds": 3.477,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Process_discovery.log",
       "test_methods": 3
     },
     {
@@ -503,8 +503,8 @@
         "tests/doctor-test.sh"
       ],
       "exit_code": 0,
-      "seconds": 0.365,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Doctor_diagnoses.log"
+      "seconds": 0.315,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Doctor_diagnoses.log"
     },
     {
       "name": "Windows shim build",
@@ -514,8 +514,8 @@
         "shim/nfapi/build.sh"
       ],
       "exit_code": 0,
-      "seconds": 2.979,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Windows_shim_build.log"
+      "seconds": 2.776,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Windows_shim_build.log"
     },
     {
       "name": "Windows driver presence image build",
@@ -525,8 +525,8 @@
         "shim/nfextlag/build.sh"
       ],
       "exit_code": 0,
-      "seconds": 0.115,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Windows_driver_presence_image_build.log"
+      "seconds": 0.114,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Windows_driver_presence_image_build.log"
     },
     {
       "name": "Crash guard executable build only",
@@ -536,8 +536,8 @@
         "tests/build-nfapi-compat-smoketest.sh"
       ],
       "exit_code": 0,
-      "seconds": 3.074,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Crash_guard_executable_build_only.log"
+      "seconds": 3.029,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Crash_guard_executable_build_only.log"
     },
     {
       "name": "ShellCheck runner scripts",
@@ -550,7 +550,7 @@
       ],
       "exit_code": 0,
       "seconds": 0.215,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/ShellCheck_runner_scripts.log"
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/ShellCheck_runner_scripts.log"
     },
     {
       "name": "Cppcheck native backend",
@@ -569,8 +569,8 @@
         "backend/nfq_verdict.c"
       ],
       "exit_code": 0,
-      "seconds": 26.715,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Cppcheck_native_backend.log"
+      "seconds": 26.002,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Cppcheck_native_backend.log"
     },
     {
       "name": "GCC static analyzer IPC",
@@ -584,11 +584,11 @@
         "-c",
         "backend/ipc_transport.c",
         "-o",
-        "/workspace/exitlag-validation/process-picker-cloud/ipc-analyzer.o"
+        "/workspace/exitlag-validation/process-picker-final-cloud/ipc-analyzer.o"
       ],
       "exit_code": 0,
-      "seconds": 0.165,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/GCC_static_analyzer_IPC.log"
+      "seconds": 0.115,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/GCC_static_analyzer_IPC.log"
     },
     {
       "name": "GCC static analyzer tcp_attribution",
@@ -602,11 +602,11 @@
         "-c",
         "backend/tcp_attribution.c",
         "-o",
-        "/workspace/exitlag-validation/process-picker-cloud/tcp_attribution-analyzer.o"
+        "/workspace/exitlag-validation/process-picker-final-cloud/tcp_attribution-analyzer.o"
       ],
       "exit_code": 0,
-      "seconds": 0.716,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/GCC_static_analyzer_tcp_attribution.log"
+      "seconds": 0.566,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/GCC_static_analyzer_tcp_attribution.log"
     },
     {
       "name": "GCC static analyzer process_identity",
@@ -620,11 +620,11 @@
         "-c",
         "backend/process_identity.c",
         "-o",
-        "/workspace/exitlag-validation/process-picker-cloud/process_identity-analyzer.o"
+        "/workspace/exitlag-validation/process-picker-final-cloud/process_identity-analyzer.o"
       ],
       "exit_code": 0,
-      "seconds": 0.666,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/GCC_static_analyzer_process_identity.log"
+      "seconds": 0.566,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/GCC_static_analyzer_process_identity.log"
     },
     {
       "name": "GCC static analyzer nfq_verdict",
@@ -638,11 +638,11 @@
         "-c",
         "backend/nfq_verdict.c",
         "-o",
-        "/workspace/exitlag-validation/process-picker-cloud/nfq_verdict-analyzer.o"
+        "/workspace/exitlag-validation/process-picker-final-cloud/nfq_verdict-analyzer.o"
       ],
       "exit_code": 0,
-      "seconds": 0.065,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/GCC_static_analyzer_nfq_verdict.log"
+      "seconds": 0.032,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/GCC_static_analyzer_nfq_verdict.log"
     },
     {
       "name": "ASan UBSan native IPC transport",
@@ -657,8 +657,8 @@
         "LDFLAGS=-fsanitize=address,undefined"
       ],
       "exit_code": 0,
-      "seconds": 0.721,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/ASan_UBSan_native_IPC_transport.log"
+      "seconds": 0.569,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/ASan_UBSan_native_IPC_transport.log"
     },
     {
       "name": "ASan UBSan NFQUEUE verdict encoding",
@@ -673,8 +673,8 @@
         "LDFLAGS=-fsanitize=address,undefined"
       ],
       "exit_code": 0,
-      "seconds": 0.37,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/ASan_UBSan_NFQUEUE_verdict_encoding.log"
+      "seconds": 0.219,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/ASan_UBSan_NFQUEUE_verdict_encoding.log"
     },
     {
       "name": "ASan UBSan shim IPC validation",
@@ -685,8 +685,8 @@
         "--sanitize"
       ],
       "exit_code": 0,
-      "seconds": 0.969,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/ASan_UBSan_shim_IPC_validation.log"
+      "seconds": 0.666,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/ASan_UBSan_shim_IPC_validation.log"
     },
     {
       "name": "ASan UBSan native TCP attribution",
@@ -701,8 +701,8 @@
         "LDFLAGS=-fsanitize=address,undefined"
       ],
       "exit_code": 0,
-      "seconds": 0.466,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/ASan_UBSan_native_TCP_attribution.log"
+      "seconds": 0.469,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/ASan_UBSan_native_TCP_attribution.log"
     },
     {
       "name": "ASan UBSan native process identity",
@@ -717,8 +717,8 @@
         "LDFLAGS=-fsanitize=address,undefined"
       ],
       "exit_code": 0,
-      "seconds": 0.366,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/ASan_UBSan_native_process_identity.log"
+      "seconds": 0.418,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/ASan_UBSan_native_process_identity.log"
     },
     {
       "name": "ASan UBSan shim socket attribution",
@@ -729,8 +729,8 @@
         "--sanitize"
       ],
       "exit_code": 0,
-      "seconds": 2.377,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/ASan_UBSan_shim_socket_attribution.log"
+      "seconds": 2.325,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/ASan_UBSan_shim_socket_attribution.log"
     },
     {
       "name": "ASan UBSan shim PID domains",
@@ -741,8 +741,8 @@
         "--sanitize"
       ],
       "exit_code": 0,
-      "seconds": 1.574,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/ASan_UBSan_shim_PID_domains.log"
+      "seconds": 1.472,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/ASan_UBSan_shim_PID_domains.log"
     },
     {
       "name": "ASan UBSan fresh backend",
@@ -756,8 +756,8 @@
         "LDFLAGS=-fsanitize=address,undefined"
       ],
       "exit_code": 0,
-      "seconds": 1.92,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/ASan_UBSan_fresh_backend.log"
+      "seconds": 2.025,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/ASan_UBSan_fresh_backend.log"
     },
     {
       "name": "ASan UBSan authenticated backend IPC",
@@ -768,8 +768,8 @@
         "-v"
       ],
       "exit_code": 0,
-      "seconds": 3.179,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/ASan_UBSan_authenticated_backend_IPC.log",
+      "seconds": 3.178,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/ASan_UBSan_authenticated_backend_IPC.log",
       "test_methods": 16
     },
     {
@@ -782,8 +782,8 @@
         "backend"
       ],
       "exit_code": 0,
-      "seconds": 0.973,
-      "log": "/workspace/exitlag-validation/process-picker-cloud/Restore_release_backend_build.log"
+      "seconds": 1.074,
+      "log": "/workspace/exitlag-validation/process-picker-final-cloud/Restore_release_backend_build.log"
     },
     {
       "name": "Level 2 kernel routing",

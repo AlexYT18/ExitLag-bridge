@@ -244,6 +244,21 @@ class RealTkPicker(unittest.TestCase):
         self.assertFalse(self.path.exists())
         self.assertEqual(self.editor.tree.get_children(), ())
 
+    def test_saturated_checks_leave_refresh_available_for_retry(self):
+        dialog = self.select_running_game()
+        release = threading.Event()
+        self.addCleanup(release.set)
+        for number in range(4):
+            dialog.tasks.submit(f'busy-{number}', lambda: release.wait(3), lambda *_: None)
+        dialog.refresh()
+        self.assertFalse(dialog.refresh_button.instate(['disabled']))
+        self.assertIn('still running', dialog.status.get())
+        release.set()
+        self.pump(lambda: not dialog.tasks.active)
+        dialog.refresh()
+        self.pump(lambda: not dialog.refresh_button.instate(['disabled']))
+        self.assertEqual(len(dialog.process_tree.get_children()), 1)
+
 
 if __name__ == '__main__':
     if not shutil.which('Xvfb'):

@@ -61,9 +61,10 @@ entry теперь задаются явно; исходный default Debian bu
 - **26 editor unittest methods PASS**: сохранность строк/комментариев,
   duplicates, private files, symlink/hardlink/FIFO, concurrent edits, отказ
   validator, late results, bounded workers и thread ownership.
-- **6 actual Tk tests PASS**: выбор и сохранение, несколько images, native
+- **7 actual Tk tests PASS**: выбор и сохранение, несколько images, native
   explicit identity, stale process, медленный scan/закрытие и смена image во
-  время старой file inspection. Проверяется видимость настоящего окна.
+  время старой file inspection, повторный Refresh после насыщения workers.
+  Проверяется видимость настоящего окна.
 - **8 packaging unittest methods PASS** локально, включая настоящий fixture
   dpkg-deb без root. В Arch отсутствие dpkg даёт явный internal SKIP этому
   одному compatibility check; portable checks не требуют Debian tools.
@@ -81,6 +82,18 @@ Evidence: [L1 JSON](evidence/process-picker-cloud.json),
 [packaging](evidence/process-picker-packaging.txt),
 [L2 regression](evidence/process-picker-isolated.txt).
 GitHub Arch CI проверяется после push отдельно.
+
+При финальной проверке добавлена воспроизводимая регрессия насыщения workers:
+при отказе поставить scan в очередь кнопка Refresh оставалась disabled.
+[Первоначальный FAIL](evidence/process-picker-capacity-red.txt) сохранён;
+кнопка теперь снова доступна для повторной попытки. Тест прошёл после правки,
+а весь L1 прогон повторён для финального кода.
+
+Первый GitHub Arch CI завершился **51 PASS, 1 FAIL, 2 SKIP**: минимальный
+container не содержал шрифтов, и настоящий Tk вернул `failed to allocate font
+due to internal system font engine problem`. В CI добавлен `ttf-dejavu`;
+сам тест остаётся обязательным. [Исходный результат](evidence/process-picker-ci-initial.txt)
+сохранён, новый запуск проверяется отдельно.
 
 Пример настоящего окна ниже использует **синтетические** имя, PID, AppID и
 Windows image; он не изображает обнаружение настоящей игры.

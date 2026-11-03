@@ -2,7 +2,7 @@
 
 Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `dfdd0ee43e2edb850fec31621e8feffa3dea2715`. Includes TCP attribution, per-packet DNAT authorization, and the process-picker iteration with synthetic evidence; generated binaries/private runtime excluded.
 
-42 existing files changed; 138 files added.
+42 existing files changed; 140 files added.
 
 | Status | File |
 | --- | --- |
@@ -96,6 +96,8 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Added | `docs/audit/evidence/nat-iteration-initial-ipv6.txt` |
 | Added | `docs/audit/evidence/nat-iteration-isolated.txt` |
 | Added | `docs/audit/evidence/pe-exports.json` |
+| Added | `docs/audit/evidence/process-picker-capacity-red.txt` |
+| Added | `docs/audit/evidence/process-picker-ci-initial.txt` |
 | Added | `docs/audit/evidence/process-picker-cloud.json` |
 | Added | `docs/audit/evidence/process-picker-cloud.txt` |
 | Added | `docs/audit/evidence/process-picker-editor.txt` |

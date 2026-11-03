@@ -20,7 +20,7 @@ jobs:
         run: |
           pacman -Syu --noconfirm --needed \
             gcc make python tk git ca-certificates libmnl clang lld llvm \
-            shellcheck cppcheck util-linux xorg-server-xvfb xorg-xauth
+            shellcheck cppcheck util-linux xorg-server-xvfb xorg-xauth ttf-dejavu
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Prepare unprivileged test user
         run: |
