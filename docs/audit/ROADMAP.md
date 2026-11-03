@@ -11,6 +11,10 @@ decisions require a current successful callback. Next: cached conntrack tuple
 reuse and project-owned flow cleanup; then shared-fd attribution and shim
 worker lifecycle. These checkpoints do not close the complete P1 lifecycle.
 
+The [process-picker iteration](PROCESS_PICKER_ITERATION.md) adds a desktop
+selection workflow and tested process/image snapshots. Live Arch/Proton use,
+authoritative ExitLag recognition and general UDP are still unverified.
+
 ## Validation levels
 
 - **L1:** no account/game or networking privileges. Source builds, pure unit tests, loopback mock IPC, malformed inputs, static analysis and supported sanitizers. A sandbox denying socket creation must report that specific blockage.

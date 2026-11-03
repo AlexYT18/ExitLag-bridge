@@ -1,8 +1,8 @@
 # Changed files
 
-Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `dfdd0ee43e2edb850fec31621e8feffa3dea2715`. Includes TCP attribution and per-packet DNAT authorization with synthetic evidence; generated binaries/private runtime excluded.
+Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `dfdd0ee43e2edb850fec31621e8feffa3dea2715`. Includes TCP attribution, per-packet DNAT authorization, and the process-picker iteration with synthetic evidence; generated binaries/private runtime excluded.
 
-40 existing files changed; 122 files added.
+42 existing files changed; 138 files added.
 
 | Status | File |
 | --- | --- |
@@ -23,12 +23,14 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Modified | `backend/protocol.h` |
 | Added | `backend/tcp_attribution.c` |
 | Added | `backend/tcp_attribution.h` |
+| Modified | `docs/arch-linux.md` |
 | Modified | `docs/architecture.md` |
 | Added | `docs/audit/BASELINE_TESTING.md` |
 | Added | `docs/audit/CHANGED_FILES.md` |
 | Added | `docs/audit/FILE_INVENTORY.md` |
 | Added | `docs/audit/INITIAL_AUDIT.md` |
 | Added | `docs/audit/ITERATION_REPORT.md` |
+| Added | `docs/audit/PROCESS_PICKER_ITERATION.md` |
 | Added | `docs/audit/ROADMAP.md` |
 | Added | `docs/audit/SOURCE_HASHES.json` |
 | Added | `docs/audit/TCP_ATTRIBUTION_ITERATION.md` |
@@ -94,6 +96,14 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Added | `docs/audit/evidence/nat-iteration-initial-ipv6.txt` |
 | Added | `docs/audit/evidence/nat-iteration-isolated.txt` |
 | Added | `docs/audit/evidence/pe-exports.json` |
+| Added | `docs/audit/evidence/process-picker-cloud.json` |
+| Added | `docs/audit/evidence/process-picker-cloud.txt` |
+| Added | `docs/audit/evidence/process-picker-editor.txt` |
+| Added | `docs/audit/evidence/process-picker-isolated.txt` |
+| Added | `docs/audit/evidence/process-picker-model.txt` |
+| Added | `docs/audit/evidence/process-picker-packaging.txt` |
+| Added | `docs/audit/evidence/process-picker-preview.png` |
+| Added | `docs/audit/evidence/process-picker-tk.txt` |
 | Added | `docs/audit/evidence/tcp-iteration-cloud.json` |
 | Added | `docs/audit/evidence/tcp-iteration-cloud.txt` |
 | Added | `docs/audit/evidence/tcp-iteration-concurrent.txt` |
@@ -108,6 +118,7 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Added | `docs/audit/notes/SHIM_IMPLEMENTATION.md` |
 | Added | `docs/audit/notes/TESTS_CI.md` |
 | Modified | `docs/compatibility.md` |
+| Added | `docs/game-selection.md` |
 | Modified | `docs/pipeline-stages.md` |
 | Modified | `docs/process-identity-translation.md` |
 | Modified | `docs/repository-layout.md` |
@@ -116,7 +127,10 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Modified | `docs/test-matrix.md` |
 | Modified | `docs/testing.md` |
 | Modified | `installers/README.md` |
+| Added | `installers/bridge_setup/process_picker.py` |
 | Modified | `installers/linux/app.py` |
+| Modified | `installers/linux/build.py` |
+| Added | `installers/linux/game_picker.py` |
 | Modified | `installers/linux/run_root.py` |
 | Modified | `macos/test_pf_plan.py` |
 | Modified | `macos/test_wine_socket.py` |
@@ -133,6 +147,7 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Modified | `tests/build-nfapi-compat-smoketest.sh` |
 | Added | `tests/cloud_checks.py` |
 | Modified | `tests/discovery-test.sh` |
+| Added | `tests/gui-picker-smoke.py` |
 | Modified | `tests/harden-runtime-test.sh` |
 | Modified | `tests/identity-assistant-test.sh` |
 | Added | `tests/integration_support.py` |
@@ -160,10 +175,13 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Modified | `tests/test-udp-observe.py` |
 | Added | `tests/test_backend_ipc.py` |
 | Added | `tests/test_benchmark_ipc.py` |
+| Added | `tests/test_game_picker.py` |
 | Added | `tests/test_identity_tools.py` |
 | Modified | `tests/test_linux_desktop.py` |
 | Added | `tests/test_linux_launcher.py` |
+| Added | `tests/test_linux_packaging.py` |
 | Added | `tests/test_llvm_toolchain.py` |
+| Added | `tests/test_process_picker.py` |
 | Added | `tests/test_runner.py` |
 | Modified | `tools/exitlag-doctor.sh` |
 | Modified | `tools/identity-map-assistant.py` |

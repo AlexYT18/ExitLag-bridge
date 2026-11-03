@@ -87,6 +87,11 @@ preserved. The shared portable archive contains its own `uninstall.sh`.
 
 ### Launch and removal
 
+The development branch provides a [running-game picker](../docs/game-selection.md)
+under Configure games. For Wine/Proton it captures prefix/runtime and offers
+actual PE images, removing normal manual Linux-path entry. The upstream release
+downloads above predate this interface. Advanced mappings remain available.
+
 Use **Configure games** to select the actual native executable or the game's
 Wine/Proton prefix and enter the Windows executable identity recognized by
 ExitLag. A prefix mapping additionally requires selecting the actual Wine/Proton
@@ -122,6 +127,13 @@ make -C backend
 python3 installers/build_runtime.py payloads --output installers/payloads
 python3 installers/linux/build.py --output build/releases
 ```
+
+On Arch Linux x86_64, after building the same required runtime payloads, use
+`python3 installers/linux/build.py --portable-only --output build/releases`.
+This produces the portable installer without `dpkg` or a Debian package. The
+builder does not download or include the proprietary ExitLag client. An absent
+`installers/payloads` directory must be built first; a source archive alone is
+not an installable runtime package.
 
 ## Verification and distribution
 

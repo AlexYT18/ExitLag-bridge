@@ -7,6 +7,8 @@
 - [Полный отчёт об изменениях и проверках](docs/audit/ITERATION_REPORT.md)
 - [TCP attribution](docs/audit/TCP_ATTRIBUTION_ITERATION.md)
 - [Текущая итерация: авторизация DNAT и точка продолжения](docs/audit/TCP_AUTHORIZATION_ITERATION.md)
+- [Выбор запущенной игры без ручных Linux-путей](docs/game-selection.md)
+- [Итерация интерфейса и её проверки](docs/audit/PROCESS_PICKER_ITERATION.md)
 - [Начальный аудит](docs/audit/INITIAL_AUDIT.md)
 - [Все 185 исходных файлов](docs/audit/FILE_INVENTORY.md)
 - [Перечень изменённых файлов](docs/audit/CHANGED_FILES.md)

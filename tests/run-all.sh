@@ -102,6 +102,10 @@ if [[ "$tier" == unit || "$tier" == system || "$tier" == live || "$tier" == all 
     run_test "identity-map assistant" none "$repo_root/tests/identity-assistant-test.sh"
     run_test "setup simulation"       none "$repo_root/tests/setup-simulation-test.sh"
     run_test "integration peer units" none python3 "$repo_root/tests/test-integration-support.py"
+    run_test "process picker model" none python3 "$repo_root/tests/test_process_picker.py"
+    run_test "game mapping editor" none python3 "$repo_root/tests/test_game_picker.py"
+    run_test "Linux source packaging" none python3 "$repo_root/tests/test_linux_packaging.py"
+    run_test "Tk process picker integration" none python3 "$repo_root/tests/gui-picker-smoke.py"
 fi
 
 # ---------------------------------------------------------------- system

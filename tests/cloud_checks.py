@@ -116,10 +116,13 @@ def main():
     syntax(checks)
     python_suites = ["test_discovery_filters.py", "test_identity_tools.py", "test_installer.py",
                      "test_linux_desktop.py", "test_linux_launcher.py", "test_mac_distribution.py",
+                     "test_process_picker.py", "test_game_picker.py", "test_linux_packaging.py",
                      "test_source_audit.py", "test_runner.py", "test-integration-support.py",
                      "test_benchmark_ipc.py", "test_llvm_toolchain.py"]
     for filename in python_suites:
         checks.run(filename, [sys.executable, "tests/" + filename], unit_test=True)
+    checks.run("Tk process picker integration", [sys.executable, "tests/gui-picker-smoke.py"],
+               needs=("Xvfb",), unit_test=True)
     checks.run("macOS account-free units", [sys.executable, "-m", "unittest", "discover", "-s", "macos", "-p", "test_*.py", "-v"], unit_test=True)
     cc = shlex.split(os.environ.get("CC", "cc"))
     cxx = shlex.split(os.environ.get("CXX", "c++"))

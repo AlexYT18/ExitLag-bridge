@@ -45,6 +45,13 @@ hint; runtime authorization requires the observed owner's `WINEPREFIX`.
 
 ## Migration and assisted configuration
 
+The desktop [running-game picker](game-selection.md) captures the observed
+executable/prefix and offers real mapped PE images or an actual file picker.
+It rechecks process generation, credentials, executable, held sockets and image
+metadata before producing a row. It derives Windows paths from verified Wine
+drives, without treating them as an authoritative ExitLag catalogue match.
+Native games with no established Windows identity still require explicit input.
+
 Old two-column prefix-only rows fail startup with `requires OWNER_EXE third
 column`. Select the real game socket owner, review its exact executable and
 prefix, and add the third column. Do not copy a generic `wine` path from an

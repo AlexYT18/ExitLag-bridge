@@ -44,6 +44,12 @@ inspect the installed official client and skip if it is absent.
 framing, v3 handshake validation, heartbeat and import/isolation gates using
 socketpairs and temporary token fixtures. It does not run netfilter.
 
+The process-picker model, mapping editor and packaging fixtures run in the
+cloud-safe suite. `tests/gui-picker-smoke.py` additionally starts its own Xvfb
+and exercises actual Tk selection, image ambiguity, native identity fallback,
+private saves, stale owners, late file results and responsive window closure.
+Its process data are explicitly synthetic; no game recognition is implied.
+
 These checks do not establish gameplay or full vendor ABI semantics. In
 particular, source assertions about a validator are weaker than a real packet
 traversing that validator.
