@@ -1,0 +1,75 @@
+IPv4 identity pid=707: PASS; bidirectional bytes/source and replacement count
+IPv4 identity pid=707: PASS; bidirectional bytes/source and replacement count
+IPv4 identity pid=707: PASS; bidirectional bytes/source and replacement count
+IPv4 simultaneous distinct process/socket attribution: PASS
+IPv4 identity pid=716: PASS; bidirectional bytes/source and replacement count
+IPv4 rewrite pid=716: PASS; bidirectional bytes/source and replacement count
+IPv4 rewrite pid=717: PASS; bidirectional bytes/source and replacement count
+IPv4 local-rewrite pid=726: PASS; bidirectional bytes/source and replacement count
+IPv4 ordinary loopback proxy rewrite restores connected UDP source: PASS
+IPv4 one unconnected socket with two in-flight relay remotes: PASS
+IPv4 identity pid=716: PASS; bidirectional bytes/source and replacement count
+IPv4 receive-empty pid=716: PASS; bidirectional bytes/source and replacement count
+IPv4 wrong-tag pid=716: PASS; bidirectional bytes/source and replacement count
+IPv4 wrong-endpoint pid=716: PASS; bidirectional bytes/source and replacement count
+IPv4 duplicate pid=716: PASS; bidirectional bytes/source and replacement count
+IPv4 options pid=716: PASS; bidirectional bytes/source and replacement count
+IPv4 status pid=716: PASS; bidirectional bytes/source and replacement count
+IPv4 direction pid=716: PASS; bidirectional bytes/source and replacement count
+IPv4 zero-port pid=716: PASS; bidirectional bytes/source and replacement count
+IPv4 wrong-family pid=716: PASS; bidirectional bytes/source and replacement count
+IPv4 bad-receive pid=716: PASS; bidirectional bytes/source and replacement count
+IPv4 rewrite pid=753: PASS; bidirectional bytes/source and replacement count
+IPv4 collision pid=756: PASS; bidirectional bytes/source and replacement count
+IPv4 rewrite pid=753: PASS; bidirectional bytes/source and replacement count
+IPv4 shared-local cross-process relay collision fails open: PASS
+IPv4 identity pid=762: PASS; bidirectional bytes/source and replacement count
+IPv4 identity pid=765: PASS; bidirectional bytes/source and replacement count
+IPv4 immediate local-port reuse has fresh PID and endpoint: PASS
+IPv4 persistent-control pid=768: PASS; bidirectional bytes/source and replacement count
+IPv4 persistent-control pid=768: PASS; bidirectional bytes/source and replacement count
+IPv4 lifecycle control remains fail-open across datagrams: PASS
+IPv4 identity pid=773: PASS; bidirectional bytes/source and replacement count
+IPv4 identity pid=774: PASS; bidirectional bytes/source and replacement count
+IPv4 nonzero packet fwmark fails open and 32-bit raw priority is preserved: PASS
+IPv6 simultaneous distinct process/socket attribution: PASS
+IPv6 identity pid=783: PASS; bidirectional bytes/source and replacement count
+IPv6 rewrite pid=783: PASS; bidirectional bytes/source and replacement count
+IPv6 rewrite pid=784: PASS; bidirectional bytes/source and replacement count
+IPv6 local-rewrite pid=793: PASS; bidirectional bytes/source and replacement count
+IPv6 ordinary loopback proxy rewrite restores connected UDP source: PASS
+IPv6 one unconnected socket with two in-flight relay remotes: PASS
+IPv6 identity pid=783: PASS; bidirectional bytes/source and replacement count
+IPv6 receive-empty pid=783: PASS; bidirectional bytes/source and replacement count
+IPv6 wrong-tag pid=783: PASS; bidirectional bytes/source and replacement count
+IPv6 wrong-endpoint pid=783: PASS; bidirectional bytes/source and replacement count
+IPv6 duplicate pid=783: PASS; bidirectional bytes/source and replacement count
+IPv6 options pid=783: PASS; bidirectional bytes/source and replacement count
+IPv6 status pid=783: PASS; bidirectional bytes/source and replacement count
+IPv6 direction pid=783: PASS; bidirectional bytes/source and replacement count
+IPv6 zero-port pid=783: PASS; bidirectional bytes/source and replacement count
+IPv6 wrong-family pid=783: PASS; bidirectional bytes/source and replacement count
+IPv6 bad-receive pid=783: PASS; bidirectional bytes/source and replacement count
+IPv6 rewrite pid=820: PASS; bidirectional bytes/source and replacement count
+IPv6 collision pid=823: PASS; bidirectional bytes/source and replacement count
+IPv6 rewrite pid=820: PASS; bidirectional bytes/source and replacement count
+IPv6 shared-local cross-process relay collision fails open: PASS
+IPv6 identity pid=829: PASS; bidirectional bytes/source and replacement count
+IPv6 identity pid=832: PASS; bidirectional bytes/source and replacement count
+IPv6 immediate local-port reuse has fresh PID and endpoint: PASS
+IPv6 persistent-control pid=835: PASS; bidirectional bytes/source and replacement count
+IPv6 persistent-control pid=835: PASS; bidirectional bytes/source and replacement count
+IPv6 lifecycle control remains fail-open across datagrams: PASS
+IPv6 identity pid=840: PASS; bidirectional bytes/source and replacement count
+IPv6 identity pid=841: PASS; bidirectional bytes/source and replacement count
+IPv6 nonzero packet fwmark fails open and 32-bit raw priority is preserved: PASS
+IPv4 identity pid=716: PASS; bidirectional bytes/source and replacement count
+IPv6 identity pid=783: PASS; bidirectional bytes/source and replacement count
+IPv4 identity pid=768: PASS; bidirectional bytes/source and replacement count
+IPv6 identity pid=835: PASS; bidirectional bytes/source and replacement count
+IPv4 timeout pid=716: PASS; bidirectional bytes/source and replacement count
+IPv4 identity pid=716: PASS; bidirectional bytes/source and replacement count
+IPv4 identity pid=716: PASS; bidirectional bytes/source and replacement count
+simultaneous NFQUEUE packet and PONG preserve the authenticated session: PASS
+new shim session lifecycle: PASS; genuine local synthetic relay bytes observed
+synthetic UDP multi: 63 probes PASS; owned resources cleaned; live ExitLag/gameplay NOT TESTED

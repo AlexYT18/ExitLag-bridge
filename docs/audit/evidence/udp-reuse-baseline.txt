@@ -1,0 +1,5 @@
+expected first PID 21 second PID 1
+actual callback identities (PID, endpoint, direction, payload): [(21, 1880840250327040, 2, 'one'), (21, 1880840250327040, 1, 'reply:one'), (21, 1880840250327040, 2, 'two'), (21, 1880840250327040, 1, 'reply:two')]
+BASELINE CONFIRMED: second socket owned by a different live process is attributed to the exited first process
+baseline reproduction complete; synthetic echo and cleanup will be checked
+synthetic single-endpoint UDP observation: PASS; owned resources cleaned up

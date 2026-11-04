@@ -4,6 +4,10 @@ The `arch-linux-hardening` development branch adds a
 [running-game process picker](game-selection.md). The upstream release archive
 linked below predates that interface. Updating a source checkout does not update
 an already installed program; build/install the updated program separately.
+This branch also adds a minimal game dashboard and an explicit, default-off
+experimental UDP toggle. [UDP scope and validation](udp-multi.md) describes its
+synthetic IPv4/IPv6 evidence and limits. This source iteration does not publish
+a new self-contained installer; the older download below lacks these changes.
 
 **WoW Classic Era gameplay has been verified by the maintainer on Arch Linux.**
 Use the same Linux x86_64 installer as Ubuntu 22.04 and 24.04.

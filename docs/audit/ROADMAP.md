@@ -15,6 +15,14 @@ The [process-picker iteration](PROCESS_PICKER_ITERATION.md) adds a desktop
 selection workflow and tested process/image snapshots. Live Arch/Proton use,
 authoritative ExitLag recognition and general UDP are still unverified.
 
+The [UDP integration iteration](UDP_INTEGRATION_ITERATION.md) adds an explicit
+experimental multi-endpoint IPv4/IPv6 mode with synthetic bidirectional kernel
+tests, fresh socket/process generations and bounded reverse bindings. The old
+single-endpoint experiment is preserved. A minimal desktop dashboard exposes
+the opt-in mode. Async SDK semantics, worker stop/join, policy-routing coexistence,
+performance and live game/relay evidence remain open; these tests do not close
+the full P1/P2 scope below.
+
 ## Validation levels
 
 - **L1:** no account/game or networking privileges. Source builds, pure unit tests, loopback mock IPC, malformed inputs, static analysis and supported sanitizers. A sandbox denying socket creation must report that specific blockage.

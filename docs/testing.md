@@ -64,6 +64,7 @@ traversing that validator.
 | IPv6 active rewrite | real netfilter/IPv6 connection with a synthetic authenticated routing peer |
 | IPv4 TCP redirect | v3 synthetic peer, real NFQUEUE/DNAT, loopback proxy, bidirectional payload and original application peer |
 | IPv4 UDP observation/steering | one local veth endpoint, v3 synthetic peer, lifecycle/post messages and the existing single-datagram active contract |
+| IPv4/IPv6 multi-endpoint UDP | multiple processes, dynamic remotes, connected/unconnected sockets, payload and source translation, local proxies, invalid posts, socket reuse, reconnect and stale poll readiness; synthetic callbacks only |
 
 Root alone is insufficient: netfilter capabilities, kernel features, tools and
 IPv6 availability also matter. Record internal skips and unsupported-host

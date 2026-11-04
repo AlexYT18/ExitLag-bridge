@@ -1,8 +1,8 @@
 # Changed files
 
-Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `dfdd0ee43e2edb850fec31621e8feffa3dea2715`. Includes TCP attribution, per-packet DNAT authorization, and the process-picker iteration with synthetic evidence; generated binaries/private runtime excluded.
+Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `dfdd0ee43e2edb850fec31621e8feffa3dea2715`. Includes TCP attribution/authorization, process picker, experimental multi-endpoint UDP and minimal dashboard. Synthetic evidence is included; generated binaries and private runtime are excluded.
 
-42 existing files changed; 140 files added.
+43 existing files changed; 177 files added.
 
 | Status | File |
 | --- | --- |
@@ -21,8 +21,15 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Added | `backend/process_identity.c` |
 | Added | `backend/process_identity.h` |
 | Modified | `backend/protocol.h` |
+| Added | `backend/run-udp-multi.sh` |
 | Added | `backend/tcp_attribution.c` |
 | Added | `backend/tcp_attribution.h` |
+| Added | `backend/udp_attribution.c` |
+| Added | `backend/udp_attribution.h` |
+| Added | `backend/udp_packet.c` |
+| Added | `backend/udp_packet.h` |
+| Added | `backend/udp_peers.c` |
+| Added | `backend/udp_peers.h` |
 | Modified | `docs/arch-linux.md` |
 | Modified | `docs/architecture.md` |
 | Added | `docs/audit/BASELINE_TESTING.md` |
@@ -35,6 +42,8 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Added | `docs/audit/SOURCE_HASHES.json` |
 | Added | `docs/audit/TCP_ATTRIBUTION_ITERATION.md` |
 | Added | `docs/audit/TCP_AUTHORIZATION_ITERATION.md` |
+| Added | `docs/audit/UDP_FOUNDATION_CHECKPOINT.md` |
+| Added | `docs/audit/UDP_INTEGRATION_ITERATION.md` |
 | Added | `docs/audit/evidence/IPC_hostile_input.txt` |
 | Added | `docs/audit/evidence/IPv6_active_rewrite.txt` |
 | Added | `docs/audit/evidence/TCP_synthetic_redirect.txt` |
@@ -110,6 +119,27 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Added | `docs/audit/evidence/tcp-iteration-cloud.txt` |
 | Added | `docs/audit/evidence/tcp-iteration-concurrent.txt` |
 | Added | `docs/audit/evidence/tcp-iteration-isolated.txt` |
+| Added | `docs/audit/evidence/udp-checkpoint-sanitizers.txt` |
+| Added | `docs/audit/evidence/udp-checkpoint-units.txt` |
+| Added | `docs/audit/evidence/udp-cloud-initial-failed.txt` |
+| Added | `docs/audit/evidence/udp-dashboard-preview.png` |
+| Added | `docs/audit/evidence/udp-dashboard-tk.txt` |
+| Added | `docs/audit/evidence/udp-environment.txt` |
+| Added | `docs/audit/evidence/udp-final-cloud.json` |
+| Added | `docs/audit/evidence/udp-final-cloud.txt` |
+| Added | `docs/audit/evidence/udp-integration-isolated-initial-failed.txt` |
+| Added | `docs/audit/evidence/udp-integration-isolated.txt` |
+| Added | `docs/audit/evidence/udp-ipc-regression-corrected.txt` |
+| Added | `docs/audit/evidence/udp-launcher-final.txt` |
+| Added | `docs/audit/evidence/udp-multi-l2-first-failed.txt` |
+| Added | `docs/audit/evidence/udp-multi-l2-proc-observer-unavailable.txt` |
+| Added | `docs/audit/evidence/udp-multi-l2.txt` |
+| Added | `docs/audit/evidence/udp-packaging-final.txt` |
+| Added | `docs/audit/evidence/udp-reuse-baseline.txt` |
+| Added | `docs/audit/evidence/udp-shim-worker-table-build.txt` |
+| Added | `docs/audit/evidence/udp-shim-worker-table-exports.txt` |
+| Added | `docs/audit/evidence/udp-shim-worker-table-native.txt` |
+| Added | `docs/audit/evidence/udp-supervisor-final.txt` |
 | Added | `docs/audit/evidence/working-tree-privacy.json` |
 | Added | `docs/audit/notes/BACKEND.md` |
 | Added | `docs/audit/notes/BACKEND_IMPLEMENTATION.md` |
@@ -128,6 +158,7 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Modified | `docs/runtime-hardening.md` |
 | Modified | `docs/test-matrix.md` |
 | Modified | `docs/testing.md` |
+| Added | `docs/udp-multi.md` |
 | Modified | `installers/README.md` |
 | Added | `installers/bridge_setup/process_picker.py` |
 | Modified | `installers/linux/app.py` |
@@ -140,10 +171,12 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Added | `shim/llvm-toolchain.sh` |
 | Modified | `shim/nfapi/build.sh` |
 | Added | `shim/nfapi/ipc_validation.h` |
+| Modified | `shim/nfapi/kernel32.def` |
 | Modified | `shim/nfapi/nfapi_stub.cpp` |
 | Added | `shim/nfapi/pid_domain.h` |
 | Added | `shim/nfapi/socket_attribution.h` |
 | Added | `shim/nfapi/tcp_callback_policy.h` |
+| Added | `shim/nfapi/udp_validation.h` |
 | Modified | `shim/nfextlag/build.sh` |
 | Added | `tests/benchmark-ipc.py` |
 | Modified | `tests/build-nfapi-compat-smoketest.sh` |
@@ -174,6 +207,7 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Added | `tests/test-shim-validation.sh` |
 | Added | `tests/test-tcp-authorization.py` |
 | Modified | `tests/test-tcp-redirect.py` |
+| Added | `tests/test-udp-multi.py` |
 | Modified | `tests/test-udp-observe.py` |
 | Added | `tests/test_backend_ipc.py` |
 | Added | `tests/test_benchmark_ipc.py` |
@@ -185,6 +219,10 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Added | `tests/test_llvm_toolchain.py` |
 | Added | `tests/test_process_picker.py` |
 | Added | `tests/test_runner.py` |
+| Added | `tests/udp-attribution-test.c` |
+| Added | `tests/udp-multi-client.py` |
+| Added | `tests/udp-packet-test.c` |
+| Added | `tests/udp-peers-test.c` |
 | Modified | `tools/exitlag-doctor.sh` |
 | Modified | `tools/identity-map-assistant.py` |
 | Modified | `tools/scan-linux-games.py` |

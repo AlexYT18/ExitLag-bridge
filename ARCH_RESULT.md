@@ -6,7 +6,9 @@
 
 - [Полный отчёт об изменениях и проверках](docs/audit/ITERATION_REPORT.md)
 - [TCP attribution](docs/audit/TCP_ATTRIBUTION_ITERATION.md)
-- [Текущая итерация: авторизация DNAT и точка продолжения](docs/audit/TCP_AUTHORIZATION_ITERATION.md)
+- [Авторизация DNAT](docs/audit/TCP_AUTHORIZATION_ITERATION.md)
+- [Текущая итерация: UDP и минимальный интерфейс](docs/audit/UDP_INTEGRATION_ITERATION.md)
+- [Включение UDP и ограничения](docs/udp-multi.md)
 - [Выбор запущенной игры без ручных Linux-путей](docs/game-selection.md)
 - [Итерация интерфейса и её проверки](docs/audit/PROCESS_PICKER_ITERATION.md)
 - [Начальный аудит](docs/audit/INITIAL_AUDIT.md)

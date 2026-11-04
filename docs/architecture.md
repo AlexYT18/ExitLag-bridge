@@ -113,22 +113,30 @@ That observation is not a new live result for the current checkout.
 ## UDP flow
 
 This backend's active UDP path uses take-and-reinject rather than the TCP DNAT
-map. It supports a narrow IPv4 callback contract; it is not general UDP support.
+map. The original narrow IPv4 experiment remains available. The opt-in
+`--apply-udp --udp-multi` path additionally handles synchronous posts for
+multiple IPv4/IPv6 endpoints, dynamic remotes and changed payloads. This is an
+experimental callback contract, not verified compatibility with every game.
 
 Two chains (`output_udp_observe`, `input_udp_observe`, filter priority -10)
 queue datagrams in both directions. The helper tracks endpoints keyed by a
 synthetic 64-bit id and reports lifecycle events (`udpCreated`,
 `udpConnectRequest`) plus each datagram to ExitLag.
 
-For a supported outgoing callback, the posted remote address and payload must
-match the original datagram and the recorded remote rule must match. After a
-successful raw send carrying mark `0x584c0001`, the helper drops the original.
+In the legacy single-endpoint mode, the posted remote address and payload must
+match the original datagram and the recorded remote rule must match. Multi mode
+requires one correlated, synchronous post, verifies the current socket inode,
+process generation and configured identity, and permits validated changes.
+After a successful raw send carrying mark `0x584c0001`, the helper drops the original.
 A dedicated rule accepts that mark so the reinjected copy does not re-enter
-the queue. The supported receive path accepts the original incoming datagram;
-unsupported callback shapes leave it unchanged.
+the queue. Multi mode keeps bounded reverse bindings and replaces incoming
+packet bytes only after a validated receive post still belongs to that socket.
+The codec rebuilds IP/UDP lengths and checksums. Unsupported callback shapes
+leave the queued packet unchanged. See [UDP support and limitations](udp-multi.md).
 
 Endpoint state is bounded and self-expiring: at most 2048 endpoints, 16 unique
-remote-address rules each. An endpoint is released when its socket inode
+remote-address rules and 16 reverse peers each. State resets at authenticated
+session replacement or disconnect. An endpoint is released when its socket inode
 disappears (checked once idle for 2s) or unconditionally after 60s idle, with a
 lifecycle event emitted to ExitLag so its own per-endpoint state is released too.
 
@@ -282,7 +290,12 @@ rerun against the current packaged installer:
   (one prefix per title); too coarse for a hand-made prefix holding several games.
 - Strict mode applies to in-prefix games too. An unmapped game must not be
   assumed to receive the configured Windows identity.
-- TCP rewriting handles both families. Active **UDP** rewriting is IPv4 only.
+- TCP rewriting handles both families. Experimental synchronous multi-endpoint
+  UDP has synthetic IPv4/IPv6 evidence; the legacy narrow mode remains IPv4.
+  Live ExitLag decisions, asynchronous UDP posts and game compatibility for the
+  new mode are unverified. Fragments, scoped IPv6, extension headers and GSO are
+  accepted unchanged. Marked UDP and unverified policy-routing combinations
+  are outside the new mode's supported routing contract.
 - The IPv6 TCP path is proven against a synthetic peer, not a live title: no
   game observed here has yet been given an IPv6 route by ExitLag, so the
   decision stage has never exercised it. See `docs/ipv6-active-rewrite.md`.
