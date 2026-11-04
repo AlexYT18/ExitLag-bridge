@@ -113,11 +113,20 @@ class BridgeTests(unittest.TestCase):
     def test_no_shim_uses_original(self):
         self.assertEqual(self.exchange(), b"origin:hello")
     def test_relay_metrics_count_real_payload(self):
+        # A successful sendall can wake the echo/incoming threads before the
+        # outgoing thread records its counters. Wait for both forwarding legs
+        # and final flow publication, rather than just one direction's metric.
+        completed = threading.Event()
+        handle_client = self.service.handle_client
+        def handle_and_signal(*args):
+            try:
+                handle_client(*args)
+            finally:
+                completed.set()
+        self.service.handle_client = handle_and_signal
         self.shim = Shim(self.service, self.routed.endpoint)
         self.assertEqual(self.exchange(), b"exitlag:hello")
-        deadline = time.monotonic() + 1
-        while self.service.snapshot()["bytes_received"] < 13 and time.monotonic() < deadline:
-            time.sleep(.01)
+        self.assertTrue(completed.wait(3), "relay flow did not finish")
         result = self.service.snapshot()
         self.assertEqual(result["redirected"], 1)
         self.assertEqual(result["bytes_sent"], 5)
