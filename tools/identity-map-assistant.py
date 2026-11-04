@@ -13,6 +13,8 @@ right and silently never matches.
 
 So this never invents a Windows identity. It proposes candidates, marks them as
 requiring confirmation, and refuses to write an entry until one is chosen.
+Prefix entries additionally require --owner-exe to approve the exact observed
+executable; environment hints alone do not authorize an identity mapping.
 """
 import argparse, json, os, subprocess, sys
 from pathlib import Path
@@ -86,6 +88,8 @@ def main():
                     help="append confirmed entries to this map file")
     ap.add_argument("--windows-identity", metavar="PATH",
                     help="the confirmed Windows image path (required with --append)")
+    ap.add_argument("--owner-exe", metavar="PATH",
+                    help="explicitly approved socket-owner executable (required for prefix mappings)")
     ap.add_argument("--pid", type=int, help="only this PID")
     args = ap.parse_args()
 
@@ -105,6 +109,7 @@ def main():
             "endpoints": [f"{s['local']} -> {s['remote']}" for s in p["sockets"][:4]],
             "launcher": p["launcher"]["exe"] if p["launcher"] else None,
             "suggested_source": p["suggested_source"],
+            "owner_executable_candidate": os.path.realpath(p["exe"]) if p["exe"] else None,
             "windows_identity": None,
             "windows_candidates": windows_candidates(p),
         }
@@ -127,6 +132,10 @@ def main():
             print( "               (not the socket owner -- do not map this)")
         print("\nSuggested source:")
         print(f"  {e['suggested_source'] or '(undetermined -- inspect manually)'}")
+        if (e['suggested_source'] or '').startswith('wineprefix:'):
+            print(f"  owner candidate: {e['owner_executable_candidate']}")
+            print("  Confirm this exact runtime executable; prefix environment alone is not proof.")
+            print("  Scope includes all applications launched by that runtime in this prefix.")
         print("\nWindows identity:")
         print("  <needs selection/confirmation -- not invented>")
         if e["windows_candidates"]:
@@ -137,6 +146,8 @@ def main():
         print("\n  Confirm with:")
         print(f"    tools/identity-map-assistant.py --pid {e['pid']} \\")
         print( "        --windows-identity 'C:\\...\\game.exe' --append runtime/games.map")
+        if (e['suggested_source'] or '').startswith('wineprefix:'):
+            print("        Add --owner-exe /absolute/verified/runtime for a prefix mapping.")
 
     if args.append:
         if not args.windows_identity:
@@ -152,7 +163,30 @@ def main():
         if not src:
             print("\nRefusing to write: no source could be determined.", file=sys.stderr)
             return 2
-        line = f"{src}\t{args.windows_identity}\n"
+        fields = [src, args.windows_identity]
+        if src.startswith("wineprefix:"):
+            if not args.owner_exe:
+                print("\nRefusing to write: prefix mappings require explicit --owner-exe approval.", file=sys.stderr)
+                return 2
+            owner = Path(args.owner_exe)
+            try:
+                owner = owner.resolve(strict=True)
+                owner_ok = (Path(args.owner_exe).is_absolute() and owner.is_file()
+                            and owner.stat().st_mode & 0o111
+                            and str(owner) == report[0]["owner_executable_candidate"])
+            except (OSError, ValueError, RuntimeError):
+                owner_ok = False
+            if not owner_ok:
+                print("\nRefusing to write: --owner-exe must match the observed executable file.", file=sys.stderr)
+                return 2
+            fields.append(str(owner))
+        elif args.owner_exe:
+            print("\nRefusing to write: --owner-exe is only valid for a prefix mapping.", file=sys.stderr)
+            return 2
+        if any(not field or any(ch in field for ch in "\t\r\n\0") for field in fields):
+            print("\nRefusing to write: map fields must be nonempty single-line values without tabs.", file=sys.stderr)
+            return 2
+        line = "\t".join(fields) + "\n"
         path = Path(args.append)
         existing = path.read_text() if path.exists() else ""
         if line in existing:

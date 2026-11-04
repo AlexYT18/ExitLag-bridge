@@ -1,0 +1,9 @@
+test_accepted_notarization_must_staple_and_validate (__main__.Distribution.test_accepted_notarization_must_staple_and_validate) ... ok
+test_notarization_rejection_cannot_staple_or_claim_success (__main__.Distribution.test_notarization_rejection_cannot_staple_or_claim_success) ... ok
+test_production_signing_refuses_ad_hoc_identity (__main__.Distribution.test_production_signing_refuses_ad_hoc_identity) ... ok
+test_signing_does_not_follow_external_links (__main__.Distribution.test_signing_does_not_follow_external_links) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.002s
+
+OK

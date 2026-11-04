@@ -1,0 +1,21 @@
+IPv4 stale loopback: PASS; original peer retained, reserved bit cleared, other priority and mark preserved
+IPv4 forged loopback priority: PASS; original peer retained, reserved bit cleared, other priority and mark preserved
+IPv6 stale loopback: PASS; original peer retained, reserved bit cleared, other priority and mark preserved
+IPv6 forged loopback priority: PASS; original peer retained, reserved bit cleared, other priority and mark preserved
+IPv4 helper absent: PASS; original peer retained, reserved bit cleared, other priority and mark preserved
+IPv6 helper absent: PASS; original peer retained, reserved bit cleared, other priority and mark preserved
+IPv4 no authenticated shim: PASS; original peer retained, reserved bit cleared, other priority and mark preserved
+IPv6 no authenticated shim: PASS; original peer retained, reserved bit cleared, other priority and mark preserved
+IPv4 mock unchanged: PASS; original peer retained, reserved bit cleared, other priority and mark preserved
+IPv6 mock unchanged: PASS; original peer retained, reserved bit cleared, other priority and mark preserved
+IPv4 mock no-handler: PASS; original peer retained, reserved bit cleared, other priority and mark preserved
+IPv6 mock no-handler: PASS; original peer retained, reserved bit cleared, other priority and mark preserved
+IPv4 mock invalid: PASS; original peer retained, reserved bit cleared, other priority and mark preserved
+IPv6 mock invalid: PASS; original peer retained, reserved bit cleared, other priority and mark preserved
+IPv4 mock valid: PASS; original peer retained, reserved bit cleared, other priority and mark preserved
+IPv6 mock valid: PASS; original peer retained, reserved bit cleared, other priority and mark preserved
+IPv4 loopback outside destination scope: PASS; original peer retained, reserved bit preserved outside scope, other priority and mark preserved
+IPv4 peer outside destination scope: PASS; original peer retained, reserved bit preserved outside scope, other priority and mark preserved
+IPv6 loopback outside destination scope: PASS; original peer retained, reserved bit preserved outside scope, other priority and mark preserved
+IPv6 peer outside destination scope: PASS; original peer retained, reserved bit preserved outside scope, other priority and mark preserved
+stale-map TCP authorization: PASS; IPv4/IPv6 and cleanup; cached conntrack NOT TESTED

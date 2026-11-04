@@ -1,0 +1,9 @@
+GitHub Arch Linux source validation: initial run
+Run: https://github.com/AlexYT18/ExitLag-bridge/actions/runs/41623413489
+HEAD: 7d664b7231a66d8dcccf1fb0de17eb5f7446abfd
+Result: 51 PASS, 1 FAIL, 2 SKIP
+Failed group: Tk process picker integration (6 errors)
+Observed error: _tkinter.TclError: failed to allocate font due to internal system font engine problem
+Cause: minimal Arch container had Xvfb/Tk but no installed font package.
+Change: install ttf-dejavu in the Arch CI dependency step; retain the real Tk test.
+Replacement run must be verified independently.

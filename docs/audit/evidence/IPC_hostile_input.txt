@@ -1,0 +1,47 @@
+=== framing and length ===
+  PASS  survived: truncated header (3 bytes)
+  PASS  survived: header claiming 4 GiB
+  PASS  survived: header claiming 1 GiB
+  PASS  survived: length one byte over max payload
+  PASS  survived: header then immediate close
+  PASS  survived: zero-length body on a sized type
+  PASS  survived: bad magic after auth
+
+=== message types ===
+  PASS  survived: unknown type 0x7FFF
+  PASS  survived: type 0 with payload
+  PASS  survived: helper-to-shim type sent inbound
+  PASS  survived: second HELLO mid-session
+
+=== sockaddr and address validation ===
+  PASS  survived: reply with a 12-byte sockaddr
+  PASS  survived: reply, family 0
+  PASS  survived: reply, IPv4 0.0.0.0:0
+  PASS  survived: reply, IPv4 multicast
+  PASS  survived: reply, IPv4 broadcast
+  PASS  survived: reply, IPv6 unspecified ::
+  PASS  survived: reply, IPv6 multicast ff02::1
+  PASS  survived: reply, IPv6 port zero
+  PASS  survived: reply, family 0xFFFF
+
+=== resolve-pid abuse ===
+  PASS  survived: resolve pid 0
+  PASS  survived: resolve pid 0xFFFFFFFF
+  PASS  survived: resolve pid 1 (never reported)
+  PASS  survived: resolve request, 4-byte body
+
+=== stream abuse ===
+  PASS  survived: 1 MiB of random bytes
+  PASS  survived: many tiny bad frames
+  PASS  survived: valid header, body arrives short
+
+=== disconnect mid-request, then reconnect ===
+  PASS  survived repeated mid-request disconnects
+
+=== still serving a legitimate client afterwards ===
+  PASS  a valid authenticated session still works after all of it
+
+=== no netfilter state was created ===
+  PASS  no nftables state left behind
+
+30 passed, 0 failed

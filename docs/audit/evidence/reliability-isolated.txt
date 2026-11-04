@@ -1,0 +1,54 @@
+Level 2: local synthetic peers; separate network, PID and mount namespaces.
+regression suite: tier=system-only
+logs: /workspace/exitlag-bridge/runtime/logs/suite-20261104T221526-22
+  root: yes
+  ExitLag: not running (live tier will skip)
+
+===== system (needs root) =====
+
+--- IPC hostile input
+    PASS
+
+--- lifecycle hardening
+    PASS
+
+--- IPv6 active rewrite
+    PASS
+
+--- TCP synthetic redirect
+    PASS
+
+--- TCP stale-map authorization
+    PASS
+
+--- UDP synthetic observe
+    PASS
+
+--- UDP synthetic steer
+    PASS
+
+--- UDP multi-endpoint routing
+    PASS
+
+===== summary =====
+SKIP  IPC security negatives (requires root, sudo and multiple mapped UIDs)
+PASS  IPC hostile input
+PASS  lifecycle hardening
+PASS  IPv6 active rewrite
+PASS  TCP synthetic redirect
+PASS  TCP stale-map authorization
+PASS  UDP synthetic observe
+PASS  UDP synthetic steer
+PASS  UDP multi-endpoint routing
+
+8 passed, 0 failed, 1 skipped
+
+Skipped tests are not passes. To run them:
+  - install the official ExitLag client (see README.md); it is not redistributable, so a fresh checkout will not have it
+  - start ExitLag (tools/run-exitlag-production.sh) for the live tier
+
+Not automated (need a real game and a human):
+  - TCP steering with live WoW world traffic
+  - UDP take-and-reinject against a real game's datagrams
+  - Proton routing with a real title
+  See docs/architecture.md for what each of those proved.

@@ -1,0 +1,19 @@
+test_all_skipped_cases_are_group_skip (__main__.CloudRunnerStatus.test_all_skipped_cases_are_group_skip) ... ok
+test_exit_77_is_skip (__main__.CloudRunnerStatus.test_exit_77_is_skip) ... ok
+test_missing_tool_is_skip_and_command_does_not_run (__main__.CloudRunnerStatus.test_missing_tool_is_skip_and_command_does_not_run) ... ok
+test_nonzero_exit_cannot_be_overridden_by_skip_text (__main__.CloudRunnerStatus.test_nonzero_exit_cannot_be_overridden_by_skip_text) ... ok
+test_partial_skips_preserve_counts (__main__.CloudRunnerStatus.test_partial_skips_preserve_counts) ... ok
+test_silent_unit_command_is_failure (__main__.CloudRunnerStatus.test_silent_unit_command_is_failure) ... ok
+test_zero_tests_are_failure (__main__.CloudRunnerStatus.test_zero_tests_are_failure) ... ok
+test_failure_is_fail (__main__.RunnerStatus.test_failure_is_fail) ... ok
+test_legacy_network_tests_skip_before_mutating_host (__main__.RunnerStatus.test_legacy_network_tests_skip_before_mutating_host) ... ok
+test_marker_without_changed_namespaces_is_refused (__main__.RunnerStatus.test_marker_without_changed_namespaces_is_refused) ... ok
+test_skip_code_preserves_reason_and_is_not_pass (__main__.RunnerStatus.test_skip_code_preserves_reason_and_is_not_pass) ... ok
+test_sourcing_runner_does_not_execute_suite (__main__.RunnerStatus.test_sourcing_runner_does_not_execute_suite) ... ok
+test_success_is_pass (__main__.RunnerStatus.test_success_is_pass) ... ok
+test_unknown_tier_is_error (__main__.RunnerStatus.test_unknown_tier_is_error) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.199s
+
+OK

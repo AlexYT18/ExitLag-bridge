@@ -1,68 +1,107 @@
 # Testing
 
-`tests/run-all.sh` is the entry point. Tiers are cumulative, and a tier whose
-requirements are not met is reported as **SKIP with the reason** — never as a
-pass.
+`tests/run-all.sh` is the Linux regression entry point. Tiers are cumulative:
 
 ```sh
-tests/run-all.sh unit          # no privileges, no ExitLag: any contributor
-sudo tests/run-all.sh system   # adds netfilter and privileged-IPC tests
-sudo tests/run-all.sh live     # adds tests needing a running ExitLag
-sudo tests/run-all.sh all      # everything available here
+tests/run-all.sh unit          # local build/logic checks, plus installed-client checks when available
+tests/run-isolated.sh          # system tier in disposable network/PID/mount namespaces
+sudo tests/run-all.sh live     # running-client tier; isolated cases still require namespace proof
+sudo tests/run-all.sh all      # all registered tiers whose prerequisites are met
 ```
 
-Current state: **16 passed, 0 failed, 0 skipped** with root and ExitLag running.
-On a fresh checkout without the client the unit tier is **9 passed, 0 failed,
-2 skipped**, both skips attributable to the absent non-redistributable client.
+The source runner and its output define the registered tests and result counts.
+Older totals in development notes describe earlier runs, not the current
+checkout. See the [initial audit](audit/INITIAL_AUDIT.md) and
+[test matrix](test-matrix.md); the [roadmap](audit/ROADMAP.md) lists work still to
+validate. A planned check is not a passing result.
 
-## unit — no privileges, no ExitLag
+The runner skips installed-client checks when the proprietary files are absent,
+and skips root/running-client scenarios when their declared requirements are
+not met. These skips have reasons and are not passes. Unit tests still need
+their build/runtime dependencies; an unavailable compiler or Wine can cause a
+failure rather than an automatic skip. Do not infer that all unmet prerequisites
+are detected by the tier gate.
 
-| Test | Proves |
+## Unit tier
+
+Most unit-tier checks run without root or an ExitLag account. Two legacy checks
+inspect the installed official client and skip if it is absent.
+
+| Check | Scope |
 |---|---|
-| shim builds | the nfapi shim compiles and links |
-| helper builds | `exitlag-netd` compiles warning-free |
-| nfapi ABI matches ExitLag | every nfapi symbol the installed client imports is exported by the shim, and every import Wine lacks is covered by a crash guard |
-| identity map pos/neg | an exact mapping translates; an unmapped `.exe` argv spoof is refused |
-| crash-guard smoketest | the Wine missing-import guards hold — without them this exits non-zero |
-| doctor self-check | the environment is coherent |
-| doctor diagnoses | the doctor names the right cause for eight distinct broken environments, rather than only detecting that something is wrong |
-| RPC surface scope | every privileged operation refuses out-of-scope arguments: non-loopback redirect targets, and PIDs the helper never observed |
-| process discovery | the discovery tool attributes a socket to the right PID across native, Wine and thread-group cases, and excludes shells and launchers rather than proposing them |
-| identity-map assistant | it proposes the correct source form, refuses to write an entry without a confirmed Windows identity, is idempotent, and the map it writes loads in the real helper |
-| setup simulation | install / status / uninstall / reinstall against a disposable HOME, including recovery from a corrupted prefix, with no write outside the state directory |
+| shim/helper builds | compilation/linking with the selected toolchain |
+| nfapi ABI | imports of the installed client versus shim exports and Wine guard coverage |
+| identity map | exact mapping and rejection of unsupported/spoofed identities |
+| crash-guard smoketest | selected synthetic imports return unsupported under Wine rather than crashing |
+| doctor self-check | diagnostics for the configured installed environment |
+| doctor diagnoses | diagnosis of deliberately broken test environments |
+| RPC surface | selected PID/malformed-request behavior and policy/source assertions |
+| discovery | network-owning process discovery against its fixtures |
+| identity assistant | mapping proposal, confirmed Windows identity and file-loading behavior |
+| setup simulation | install/status/removal/recovery against disposable state |
 
-## system — needs root
+`tests/test-integration-support.py` separately checks the synthetic peers'
+framing, v3 handshake validation, heartbeat and import/isolation gates using
+socketpairs and temporary token fixtures. It does not run netfilter.
 
-| Test | Proves |
+The process-picker model, mapping editor and packaging fixtures run in the
+cloud-safe suite. `tests/gui-picker-smoke.py` additionally starts its own Xvfb
+and exercises actual Tk selection, image ambiguity, native identity fallback,
+private saves, stale owners, late file results and responsive window closure.
+Its process data are explicitly synthetic; no game recognition is implied.
+
+These checks do not establish gameplay or full vendor ABI semantics. In
+particular, source assertions about a validator are weaker than a real packet
+traversing that validator.
+
+## System tier
+
+| Check | Scope |
 |---|---|
-| IPC security negatives | a foreign uid cannot drive the backend; nine malformed-framing cases, version mismatch, and liveness afterwards (12 checks) |
-| IPC hostile input | the authenticated RPC surface survives truncated, oversized, and structurally invalid messages, and stays live afterwards |
-| lifecycle hardening | start/stop cycles, stale-table refusal, orphan recovery after runner SIGKILL, fail-open with no helper, helper SIGKILL, shim reconnect, version mismatch, unreachable destination (8 scenarios) |
-| IPv6 active rewrite | an IPv6 TCP connection is redirected to an address the helper was told at runtime, and an IPv6 target the validator rejects is not armed |
+| IPC security negatives | uid/token authentication, malformed handshakes and token lifecycle |
+| IPC hostile input | the suite's malformed authenticated messages and subsequent liveness |
+| lifecycle hardening | start/stop, owned orphan recovery, traps, reconnect and probe fail-open cases |
+| IPv6 active rewrite | real netfilter/IPv6 connection with a synthetic authenticated routing peer |
+| IPv4 TCP redirect | v3 synthetic peer, real NFQUEUE/DNAT, loopback proxy, bidirectional payload and original application peer |
+| IPv4 UDP observation/steering | one local veth endpoint, v3 synthetic peer, lifecycle/post messages and the existing single-datagram active contract |
+| IPv4/IPv6 multi-endpoint UDP | multiple processes, dynamic remotes, connected/unconnected sockets, payload and source translation, local proxies, invalid posts, socket reuse, reconnect and stale poll readiness; synthetic callbacks only |
 
-## live — needs root and a running ExitLag
+Root alone is insufficient: netfilter capabilities, kernel features, tools and
+IPv6 availability also matter. Record internal skips and unsupported-host
+messages as limitations, even if an individual script returns success. A queue
+bypass probe does not show survival of an existing proxied game connection.
 
-| Test | Proves |
-|---|---|
-| external Wine prefix routing | a Windows process in a *different* Wine prefix is translated and redirected, an unmapped prefix is not, and ExitLag's own process table cannot see either |
+The network integration harnesses require `tests/run-isolated.sh` to establish
+different network and PID namespaces before mutation. The wrapper uses local
+synthetic peers, not Internet game servers. If namespace creation or capabilities
+are unavailable, report that limitation rather than running these scenarios in
+the host network namespace.
 
-## Not automated
+## Live tier and manual tests
 
-These need a real game and a human, and are recorded in `docs/architecture.md`
-rather than run by CI:
+The registered live test checks an external Wine-prefix probe with a running
+ExitLag, including an unmapped control. It needs the contributor's official
+client/account setup and root privileges. It does not replace real gameplay.
 
-- TCP steering with live WoW world traffic
-- UDP take-and-reinject against a real game's datagrams
-- Proton routing with a real title (the mechanism is covered by
-  `docs/process-identity-translation.md`, verified on Proton 9.0 with
-  pressure-vessel)
+WoW gameplay, title-specific UDP behavior and Proton/Steam launch behavior are
+manual evidence. Earlier observations are summarized in
+[compatibility](compatibility.md) and [routing stages](pipeline-stages.md).
+This audit has not created new account-dependent game results.
 
-## Notes for contributors
+Additional installer/Mac suites are documented in the
+[installer guide](../installers/README.md) and [Mac README](../macos/README.md).
+They are not all registered by the Linux regression runner.
 
-Running the suite under `sudo` executes the unprivileged tier as the invoking
-user. Building as root would leave root-owned objects in a user-owned tree and
-break the next plain build — which is exactly what happened while writing this
-suite, surfacing as a confusing `Operation not permitted` during a rebuild.
+## Recording a run
 
-Individual tests are runnable on their own; each states its own requirements at
-the top. `runtime/logs/suite-<stamp>/` holds one log per test.
+Keep the source commit, artifact hash where relevant, OS/kernel, architecture,
+tool versions, command, exit code and PASS/FAIL/SKIP summary. Explain missing
+client/account, unavailable capabilities, synthetic peers and manual steps not
+performed. Use a dated run record instead of editing an old release snapshot
+into an apparent current pass.
+
+Under sudo, the runner attempts to execute ordinary unit commands as the invoking
+user to avoid root-owned build products. Review local ownership before another
+plain build if a suite was run directly as root. Per-test logs are written to
+`runtime/logs/suite-<stamp>/`; redact private paths, addresses, packet content and
+account information before sharing them.

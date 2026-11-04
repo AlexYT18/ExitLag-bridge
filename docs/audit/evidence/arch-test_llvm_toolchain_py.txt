@@ -1,0 +1,8 @@
+test_cl_alias_is_preferred_when_both_drivers_exist (__main__.ClDriverSelection.test_cl_alias_is_preferred_when_both_drivers_exist) ... ok
+test_missing_both_drivers_is_a_clear_failure (__main__.ClDriverSelection.test_missing_both_drivers_is_a_clear_failure) ... ok
+test_plain_clang_uses_explicit_cl_driver_mode (__main__.ClDriverSelection.test_plain_clang_uses_explicit_cl_driver_mode) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.013s
+
+OK

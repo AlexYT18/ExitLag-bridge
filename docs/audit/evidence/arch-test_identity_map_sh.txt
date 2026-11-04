@@ -1,0 +1,16 @@
+mapped=G:\World of Warcraft\_classic_era_\WoWClassic.exe
+negative=/usr/bin/python3.14
+PASS: canonical native identity translated through configured symlink
+PASS: Windows-looking, canonical source and argv[0] spoofs rejected
+PASS: exited process is unresolved
+PASS: prefix scope requires exact approved owner and canonical prefix
+PASS: unapproved owner, wrong prefix and absent prefix remain genuine
+PASS: argv-only map sources fail closed with migration diagnostic
+PASS: legacy prefix-only authorization rejected
+PASS: invalid prefix owner rejected
+PASS: invalid prefix owner rejected
+PASS: invalid prefix owner rejected
+PASS: non-executable prefix owner rejected
+PASS: unexpected native owner column rejected
+PASS: duplicate canonical prefix-owner key rejected
+PASS: no-map identity resolution rejects Windows-looking argv spoof

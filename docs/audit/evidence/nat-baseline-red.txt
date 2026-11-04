@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "<stdin>", line 11, in <module>
+  File "/workspace/exitlag-bridge/tests/test-tcp-authorization.py", line 265, in main
+    probe(family, remote, f'IPv{4 if family == socket.AF_INET else 6} stale loopback')
+  File "/workspace/exitlag-bridge/tests/test-tcp-authorization.py", line 177, in probe
+    raise AssertionError(f'{label}: stale map redirected an unauthorized fresh connection: {reply!r}')
+AssertionError: IPv4 stale loopback: stale map redirected an unauthorized fresh connection: bytearray(b'PROXY:ping')

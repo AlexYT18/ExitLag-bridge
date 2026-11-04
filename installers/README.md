@@ -87,11 +87,26 @@ preserved. The shared portable archive contains its own `uninstall.sh`.
 
 ### Launch and removal
 
+The development branch provides a [running-game picker](../docs/game-selection.md)
+under Configure games. For Wine/Proton it captures prefix/runtime and offers
+actual PE images, removing normal manual Linux-path entry. The upstream release
+downloads above predate this interface. Advanced mappings remain available.
+
 Use **Configure games** to select the actual native executable or the game's
 Wine/Proton prefix and enter the Windows executable identity recognized by
-ExitLag. A prefix mapping covers the entire prefix, so separate game prefixes
-are preferable. Unmapped processes retain their normal identity. Apply the game
-in ExitLag's dashboard before establishing new game connections.
+ExitLag. A prefix mapping additionally requires selecting the actual Wine/Proton
+loader executable that owns the game socket, rather than a launcher script.
+Existing two-column prefix mappings must be updated: the third Tab-separated
+column is the absolute loader executable path. Native executable mappings keep
+their two-column format. Paths must exist and executables must be regular files
+with execute permission; duplicate canonical mappings are rejected.
+
+A prefix mapping authorizes the selected loader in the entire prefix, so
+separate game prefixes are preferable. This is an explicit allowlist, not proof
+of the Windows executable running inside that prefix. Unmapped processes retain
+their normal identity. Apply the game in ExitLag's dashboard before establishing
+new game connections. See [process identity translation](../docs/process-identity-translation.md)
+for the mapping format and its trust boundary.
 
 Launching routing uses a graphical polkit administrator prompt. The installed
 root-owned supervisor only runs the installed backend, snapshots data-only game
@@ -113,6 +128,32 @@ python3 installers/build_runtime.py payloads --output installers/payloads
 python3 installers/linux/build.py --output build/releases
 ```
 
+On Arch Linux x86_64, the installed LLVM toolchain can build all required Linux
+payloads without downloading Zig:
+
+```sh
+sudo pacman -S --needed base-devel clang lld llvm bison flex m4 git
+make -C backend
+python3 installers/build_runtime.py payloads --toolchain llvm --arch x86_64 --output installers/payloads
+python3 installers/linux/build.py --portable-only --source-revision "$(git rev-parse HEAD)" --output build/releases
+cp build/installer/exitlag-bridge-wine-source.tar.gz build/releases/
+```
+
+Use a reviewed, committed tree for release builds. The `--source-revision` value
+is recorded in `program/build-info.json` with hashes for packaged program files;
+if omitted the revision is explicitly unknown (`null`). The Linux packaged shim preserves the core exports plus the two existing
+driver-management exports with explicit unsupported status; its normal `DllMain`
+entrypoint does not enable the macOS timer workaround. The exact combined export
+set is checked during payload construction. The builder verifies
+required payload hashes before staging and includes only the three Linux payloads.
+Unrelated files in `installers/payloads` are excluded. LLVM tool changes invalidate
+the cached Wine configuration; the legacy default Zig path is preserved.
+
+`--portable-only` produces the portable installer without `dpkg` or a Debian package. The
+builder does not download or include the proprietary ExitLag client. An absent
+`installers/payloads` directory must be built first; a source archive alone is
+not an installable runtime package.
+
 ## Verification and distribution
 
 `tests/test_installer.py` checks download verification, archive extraction,
@@ -120,7 +161,11 @@ private ownership, interrupted setup, interactive vendor handoff and removal.
 `tests/installer_fresh_runtime.py` boots the actual pinned Wine distribution in a
 fresh temporary prefix and verifies the patched WMI class, repeat setup and
 preserved data. No real account or proprietary executable is used in CI.
-Desktop/supervisor checks are in `tests/test_linux_desktop.py`.
+Desktop/supervisor checks are in `tests/test_linux_desktop.py` and
+`tests/test_linux_launcher.py`. The latter runs without opening a Tk window and
+covers Windows-console encodings, uncertain process queries and cleanup after a
+Wine timeout. Routing leases accept timestamps only within the previous six
+seconds; a backwards wall-clock jump stops the session until it is restarted.
 
 Installer checks do not prove routing for every game. Reports must distinguish
 world gameplay, character selection, synthetic tests and untested games. Submit

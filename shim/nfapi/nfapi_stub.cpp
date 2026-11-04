@@ -5,6 +5,13 @@
 // EXITLAG_NFAPI_SUCCEED, EXITLAG_NFAPI_EXTVER, and EXITLAG_NFAPI_INJECT are isolated
 // research overrides and are not needed by the normal runtime.
 
+#include "ipc_validation.h"
+#include "socket_attribution.h"
+#include "tcp_callback_policy.h"
+#include "pid_domain.h"
+#include "udp_validation.h"
+#include "worker_lifecycle.h"
+
 typedef void *HANDLE;
 typedef unsigned long DWORD;
 typedef int BOOL;
@@ -24,6 +31,12 @@ __declspec(dllimport) BOOL WINAPI FlushFileBuffers(HANDLE);
 __declspec(dllimport) BOOL WINAPI CloseHandle(HANDLE);
 __declspec(dllimport) DWORD WINAPI GetCurrentProcessId();
 __declspec(dllimport) DWORD WINAPI GetCurrentThreadId();
+__declspec(dllimport) DWORD WINAPI TlsAlloc();
+__declspec(dllimport) void *WINAPI TlsGetValue(DWORD);
+__declspec(dllimport) BOOL WINAPI TlsSetValue(DWORD, void *);
+__declspec(dllimport) HANDLE WINAPI GetProcessHeap();
+__declspec(dllimport) void *WINAPI HeapAlloc(HANDLE, DWORD, unsigned __int64);
+__declspec(dllimport) BOOL WINAPI HeapFree(HANDLE, DWORD, void *);
 __declspec(dllimport) DWORD WINAPI GetEnvironmentVariableW(const wchar_t *, wchar_t *, DWORD);
 __declspec(dllimport) void WINAPI GetSystemTimeAsFileTime(void *);
 __declspec(dllimport) unsigned __int64 WINAPI GetTickCount64();
@@ -58,6 +71,15 @@ __declspec(dllimport) BOOL WINAPI GetFileSizeEx(HANDLE, unsigned __int64 *);
 __declspec(dllimport) BOOL WINAPI MoveFileExW(const wchar_t *, const wchar_t *, DWORD);
 __declspec(dllimport) HANDLE WINAPI CreateThread(void *, unsigned __int64, DWORD (WINAPI *)(void *), void *, DWORD, DWORD *);
 __declspec(dllimport) void WINAPI Sleep(DWORD);
+__declspec(dllimport) DWORD WINAPI WaitForSingleObject(HANDLE, DWORD);
+__declspec(dllimport) int WINAPI shutdown(SOCKET, int);
+__declspec(dllimport) int WINAPI WSACleanup();
+__declspec(dllimport) int WINAPI WSAGetLastError();
+__declspec(dllimport) int WINAPI ioctlsocket(SOCKET, long, unsigned long *);
+__declspec(dllimport) int WINAPI getsockopt(SOCKET, int, int, char *, int *);
+struct exl_fd_set { unsigned int count; SOCKET sockets[64]; };
+struct exl_timeval { long seconds, microseconds; };
+__declspec(dllimport) int WINAPI select(int, exl_fd_set *, exl_fd_set *, exl_fd_set *, const exl_timeval *);
 }
 #define GENERIC_READ 0x80000000UL
 #define OPEN_EXISTING 3UL
@@ -784,6 +806,7 @@ namespace inject {
 static NF_EventHandler *g_handler;
 static volatile long g_running;
 static HANDLE g_thread;
+static DWORD g_thread_id;
 
 static bool read_env(const wchar_t *name, wchar_t *buf, DWORD cap)
 {
@@ -1146,7 +1169,7 @@ static DWORD WINAPI thread_main(void *)
         ((cb_void)slot(0))(g_handler);
     }
     static char buffer[65536];
-    while (g_running) {
+    while (__atomic_load_n(&g_running, __ATOMIC_ACQUIRE)) {
         HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
         if (file == INVALID_HANDLE_VALUE) { Sleep(200); continue; }
         DWORD got = 0;
@@ -1155,7 +1178,7 @@ static DWORD WINAPI thread_main(void *)
         DeleteFileW(path);
         buffer[got] = 0;
         char *line = buffer;
-        while (*line) {
+        while (*line && __atomic_load_n(&g_running, __ATOMIC_ACQUIRE)) {
             char *end = line;
             while (*end && *end != '\n' && *end != '\r') ++end;
             char saved = *end; *end = 0;
@@ -1171,18 +1194,19 @@ static DWORD WINAPI thread_main(void *)
     return 0;
 }
 
-static void start(NF_EventHandler *handler)
+static bool start(NF_EventHandler *handler)
 {
     wchar_t path[1024];
-    if (!handler || !read_env(L"EXITLAG_NFAPI_INJECT", path, sizeof(path) / sizeof(path[0]))) return;
-    g_handler = handler; g_running = 1;
-    g_thread = CreateThread(0, 0, thread_main, 0, 0, 0);
+    if (!handler || !read_env(L"EXITLAG_NFAPI_INJECT", path, sizeof(path) / sizeof(path[0]))) return true;
+    __atomic_store_n(&g_running, 1, __ATOMIC_RELEASE);
+    g_thread = CreateThread(0, 0, thread_main, 0, 0, &g_thread_id);
+    if (!g_thread) __atomic_store_n(&g_running, 0, __ATOMIC_RELEASE);
+    return g_thread != 0;
 }
 
 static void stop()
 {
-    g_running = 0;
-    g_thread = 0;
+    __atomic_store_n(&g_running, 0, __ATOMIC_RELEASE);
 }
 
 } // namespace inject
@@ -1201,126 +1225,101 @@ static void stop()
 // ExitLag from a path that could be re-entered by the helper.
 // ---------------------------------------------------------------------------
 
-#define EXL_MAGIC 0x314c5845u
-#define EXL_PROTOCOL_VERSION 3
-#define EXL_TOKEN_BYTES 32
-#define EXL_MSG_HELLO 0x0001
-#define EXL_MSG_HELLO_ACK 0x0002
-#define EXL_MSG_PING 0x0003
-#define EXL_MSG_PONG 0x0004
-#define EXL_MSG_TCP_CONNECT_REQ 0x0010
-#define EXL_MSG_TCP_CONNECT_REPLY 0x0011
-#define EXL_MSG_RESOLVE_PID_REQ 0x0020
-#define EXL_MSG_RESOLVE_PID_REPLY 0x0021
-#define EXL_MSG_UDP_CREATED_REQ 0x0040
-#define EXL_MSG_UDP_CREATED_REPLY 0x0041
-#define EXL_MSG_UDP_CONNECT_REQ 0x0042
-#define EXL_MSG_UDP_CONNECT_REPLY 0x0043
-#define EXL_MSG_UDP_DATAGRAM_REQ 0x0044
-#define EXL_MSG_UDP_DATAGRAM_REPLY 0x0045
-#define EXL_MSG_UDP_POST 0x0046
-#define EXL_MSG_UDP_STATE 0x0047
-#define EXL_MSG_UDP_CLOSED_REQ 0x0048
-#define EXL_MSG_UDP_CLOSED_REPLY 0x0049
-#define EXL_VERDICT_UNCHANGED 0
-#define EXL_VERDICT_MUTATED 1
-#define EXL_VERDICT_NO_HANDLER 2
-#define EXL_UDP_API_POST_SEND 1
-#define EXL_UDP_API_POST_RECEIVE 2
-#define EXL_UDP_API_ADD_REMOTE_RULE 3
-#define EXL_UDP_API_DISABLE_FILTERING 4
-#define EXL_UDP_API_ENABLE_FILTERING 5
-#define EXL_UDP_API_SET_FLOWCTL 6
-
-#pragma pack(push, 1)
-struct exl_header { unsigned int magic; unsigned short type; unsigned short flags; unsigned int length; };
-struct exl_hello { unsigned int version; unsigned int shim_process_id; unsigned __int64 capabilities;
-                   unsigned char token[EXL_TOKEN_BYTES]; };   // must match backend/protocol.h
-struct exl_hello_ack { unsigned int version; unsigned int helper_pid; unsigned __int64 capabilities; };
-struct exl_tcp_connect_req {
-    unsigned __int64 tag; unsigned __int64 endpoint_id; unsigned int process_id;
-    unsigned int filtering_flag; unsigned char direction; unsigned char reserved[3];
-    unsigned short ip_family; unsigned char local_address[28]; unsigned char remote_address[28];
-};
-struct exl_resolve_pid_req { unsigned __int64 tag; unsigned int process_id; unsigned int reserved; };
-struct exl_resolve_pid_reply { unsigned __int64 tag; unsigned int path_length; unsigned int reserved; };
-struct exl_tcp_connect_reply {
-    unsigned __int64 tag; unsigned int verdict; unsigned int filtering_flag;
-    unsigned char remote_address[28]; unsigned char mutated_flag; unsigned char mutated_remote;
-    unsigned char reserved[2];
-};
-struct exl_udp_lifecycle_req {
-    unsigned __int64 tag; unsigned __int64 endpoint_id; unsigned int process_id;
-    unsigned short ip_family; unsigned char local_address[28];
-};
-struct exl_udp_lifecycle_reply {
-    unsigned __int64 tag; unsigned int verdict; unsigned int process_id;
-    unsigned short ip_family; unsigned char local_address[28];
-    unsigned char mutated_info; unsigned char reserved[3];
-};
-struct exl_udp_connect_req {
-    unsigned __int64 tag; unsigned __int64 endpoint_id; unsigned int process_id;
-    unsigned int filtering_flag; unsigned short ip_family;
-    unsigned char local_address[28]; unsigned char remote_address[28];
-};
-struct exl_udp_connect_reply {
-    unsigned __int64 tag; unsigned int verdict; unsigned int process_id;
-    unsigned int filtering_flag; unsigned char remote_address[28];
-    unsigned char mutated_flag; unsigned char mutated_remote; unsigned char reserved[2];
-};
-struct exl_udp_datagram_req {
-    unsigned __int64 tag; unsigned __int64 endpoint_id; unsigned int process_id;
-    unsigned char direction; unsigned char reserved; unsigned short ip_family;
-    unsigned char local_address[28]; unsigned char remote_address[28];
-    unsigned int option_flags; unsigned int options_length; unsigned int payload_length;
-};
-struct exl_udp_datagram_reply {
-    unsigned __int64 tag; unsigned int verdict; unsigned int post_count;
-    unsigned int remote_rule_count; unsigned int control_count;
-    unsigned char mutated_remote; unsigned char mutated_payload;
-    unsigned char mutated_options; unsigned char reserved;
-};
-struct exl_udp_post {
-    unsigned __int64 event_tag; unsigned __int64 endpoint_id; unsigned int api; int status;
-    unsigned char remote_address[28]; unsigned int option_flags;
-    unsigned int options_length; unsigned int payload_length;
-};
-struct exl_udp_state {
-    unsigned __int64 event_tag; unsigned __int64 endpoint_id; unsigned int api; int status;
-    unsigned int value; unsigned int data_length;
-};
-#pragma pack(pop)
 
 namespace ipc {
 
 static volatile long g_running;
+static HANDLE g_thread;
+static DWORD g_thread_id;
+static volatile long g_socket_lock;
 static SOCKET g_socket = INVALID_SOCKET;
 static unsigned __int64 g_tag;
-static unsigned __int64 g_udp_event_tag;
-static unsigned __int64 g_udp_event_id;
-static unsigned int g_udp_post_count;
-static unsigned int g_udp_rule_count;
-static unsigned int g_udp_control_count;
 static volatile long g_send_lock;
+static unsigned __int64 g_udp_session;
 
-// PIDs observed on the Linux side. A Windows PID could share the same numeric
-// value, so origin is tracked explicitly rather than guessed from the number.
-static unsigned int g_linux_pids[128];
-static volatile long g_linux_pid_count;
+struct udp_event_context {
+    unsigned __int64 tag, id, session;
+    SOCKET socket;
+    unsigned int post_count, rule_count, control_count;
+    unsigned int direction;
+    unsigned char *scratch;
+    char *resolve_buffer;
+    unsigned char *owner_table;
+    udp_event_context *previous;
+};
 
-static void remember_linux_pid(unsigned int pid)
+// Keep the TLS slot for the DLL lifetime; worker contexts are cleared before
+// their buffers are freed, including callback-initiated deferred teardown.
+static DWORD g_udp_tls = 0xffffffffUL;
+static volatile long g_udp_tls_state;
+
+static bool ensure_udp_tls()
 {
-    if (!pid) return;
-    for (int i = 0; i < 128; ++i) if (g_linux_pids[i] == pid) return;
-    long slot = __atomic_fetch_add(&g_linux_pid_count, 1, __ATOMIC_SEQ_CST);
-    g_linux_pids[slot & 127] = pid;
+    long expected = 0;
+    if (__atomic_compare_exchange_n(&g_udp_tls_state, &expected, 1, false,
+                                     __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+        g_udp_tls = TlsAlloc();
+        __atomic_store_n(&g_udp_tls_state, g_udp_tls == 0xffffffffUL ? -1 : 2,
+                         __ATOMIC_RELEASE);
+    }
+    while (__atomic_load_n(&g_udp_tls_state, __ATOMIC_ACQUIRE) == 1) Sleep(0);
+    return __atomic_load_n(&g_udp_tls_state, __ATOMIC_ACQUIRE) == 2;
 }
 
-static bool is_linux_pid(unsigned int pid)
+static udp_event_context *current_udp_event(ENDPOINT_ID id)
 {
-    if (!pid) return false;
-    for (int i = 0; i < 128; ++i) if (g_linux_pids[i] == pid) return true;
-    return false;
+    if (__atomic_load_n(&g_udp_tls_state, __ATOMIC_ACQUIRE) != 2) return 0;
+    udp_event_context *context = (udp_event_context *)TlsGetValue(g_udp_tls);
+    if (!context || !__atomic_load_n(&g_running, __ATOMIC_ACQUIRE) ||
+        context->socket != __atomic_load_n(&g_socket, __ATOMIC_ACQUIRE) ||
+        !exl_udp_validation::context_matches(context->tag, context->id, context->session,
+            __atomic_load_n(&g_udp_session, __ATOMIC_ACQUIRE), id)) return 0;
+    return context;
+}
+
+class udp_event_scope {
+    bool bound;
+public:
+    udp_event_context context;
+    udp_event_scope(unsigned __int64 tag, ENDPOINT_ID id, unsigned int direction = 0) : bound(false), context{}
+    {
+        if (!ensure_udp_tls()) return;
+        context.previous = (udp_event_context *)TlsGetValue(g_udp_tls);
+        if (!context.previous ||
+            context.previous->session != __atomic_load_n(&g_udp_session, __ATOMIC_ACQUIRE) ||
+            context.previous->socket != __atomic_load_n(&g_socket, __ATOMIC_ACQUIRE)) return;
+        context.tag = tag; context.id = id;
+        context.direction = direction;
+        context.session = context.previous->session;
+        context.socket = context.previous->socket;
+        context.scratch = context.previous->scratch;
+        context.resolve_buffer = context.previous->resolve_buffer;
+        context.owner_table = context.previous->owner_table;
+        bound = TlsSetValue(g_udp_tls, &context) != 0;
+    }
+    bool valid() const { return bound && current_udp_event(context.id) == &context; }
+    ~udp_event_scope() { if (bound) TlsSetValue(g_udp_tls, context.previous); }
+};
+
+using exl_pid_domain::pid_origin;
+using exl_pid_domain::pid_unknown;
+using exl_pid_domain::pid_linux;
+using exl_pid_domain::pid_windows;
+using exl_pid_domain::pid_ambiguous;
+
+// Numeric Windows and Linux PIDs can collide. Record both observed domains
+// without eviction; collisions and saturation disable attributed callbacks.
+// This POD is never reset while worker/SDK calls can still refer to old PIDs.
+static exl_pid_domain::registry g_process_pids;
+
+static bool remember_process_pid(unsigned int pid, pid_origin domain)
+{
+    return exl_pid_domain::remember_pid(g_process_pids, pid, domain);
+}
+
+static pid_origin process_pid_origin(unsigned int pid)
+{
+    return exl_pid_domain::lookup_pid(g_process_pids, pid);
 }
 
 static bool send_all(SOCKET s, const char *data, int length)
@@ -1350,28 +1349,28 @@ static bool send_message(SOCKET s, unsigned short type, const void *payload, uns
 // nested, so this is safe on the same connection.
 static int resolve_linux_pid(unsigned int pid, wchar_t *buffer, unsigned long length)
 {
-    SOCKET s = g_socket;
-    if (s == INVALID_SOCKET) return 0;
+    udp_event_context *transport = __atomic_load_n(&g_udp_tls_state, __ATOMIC_ACQUIRE) == 2 ?
+        (udp_event_context *)TlsGetValue(g_udp_tls) : 0;
+    if (!transport || !transport->resolve_buffer || !buffer || !length ||
+        transport->session != __atomic_load_n(&g_udp_session, __ATOMIC_ACQUIRE) ||
+        transport->socket != __atomic_load_n(&g_socket, __ATOMIC_ACQUIRE)) return 0;
+    SOCKET s = transport->socket;
     exl_resolve_pid_req req;
-    req.tag = ++g_tag; req.process_id = pid; req.reserved = 0;
+    req.tag = __atomic_add_fetch(&g_tag, 1, __ATOMIC_RELAXED); req.process_id = pid; req.reserved = 0;
     if (!send_message(s, EXL_MSG_RESOLVE_PID_REQ, &req, sizeof(req))) return 0;
 
     for (;;) {
         exl_header head;
         if (!recv_all(s, (char *)&head, (int)sizeof(head))) return 0;
-        if (head.magic != EXL_MAGIC || head.length > 65536) return 0;
-        static char payload[131072];
+        if (!exl_ipc_validation::valid_frame_header(head)) return 0;
+        char *payload = transport->resolve_buffer;
         if (head.length && !recv_all(s, payload, (int)head.length)) return 0;
-        if (head.type != EXL_MSG_RESOLVE_PID_REPLY || head.length < sizeof(exl_resolve_pid_reply)) continue;
+        if (head.type != EXL_MSG_RESOLVE_PID_REPLY) continue;
+        if (head.length < sizeof(exl_resolve_pid_reply)) return 0;
         const exl_resolve_pid_reply *reply = (const exl_resolve_pid_reply *)payload;
         if (reply->tag != req.tag) continue;
-        unsigned int n = reply->path_length;
-        if (!n) return 0;
-        if (n > length - 1) n = (unsigned int)(length - 1);
-        const char *path = payload + sizeof(*reply);
-        for (unsigned int i = 0; i < n; ++i) buffer[i] = (wchar_t)(unsigned char)path[i];
-        buffer[n] = 0;
-        return 1;
+        return exl_ipc_validation::copy_pid_reply_path(*reply, payload, head.length,
+                                                      buffer, length) ? 1 : 0;
     }
 }
 
@@ -1385,191 +1384,178 @@ static bool send_message(SOCKET s, unsigned short type, const void *payload, uns
     return ok;
 }
 
-static bool send_message_parts(SOCKET s, unsigned short type,
-                               const void *fixed, unsigned int fixed_length,
-                               const void *first, unsigned int first_length,
-                               const void *second, unsigned int second_length)
+static bool send_udp_message_parts(udp_event_context *context, unsigned short type,
+                                   const void *fixed, unsigned int fixed_length,
+                                   const void *first, unsigned int first_length,
+                                   const void *second, unsigned int second_length)
 {
+    if (!context || first_length > EXL_MAX_PAYLOAD - fixed_length ||
+        second_length > EXL_MAX_PAYLOAD - fixed_length - first_length) return false;
     while (__atomic_exchange_n(&g_send_lock, 1, __ATOMIC_ACQUIRE)) Sleep(0);
+    bool ok = current_udp_event(context->id) == context;
     unsigned int length = fixed_length + first_length + second_length;
     exl_header head; head.magic = EXL_MAGIC; head.type = type; head.flags = 0; head.length = length;
-    bool ok = send_all(s, (const char *)&head, (int)sizeof(head)) &&
-              (!fixed_length || send_all(s, (const char *)fixed, (int)fixed_length)) &&
-              (!first_length || send_all(s, (const char *)first, (int)first_length)) &&
-              (!second_length || send_all(s, (const char *)second, (int)second_length));
+    if (ok) ok = send_all(context->socket, (const char *)&head, (int)sizeof(head)) &&
+              (!fixed_length || send_all(context->socket, (const char *)fixed, (int)fixed_length)) &&
+              (!first_length || send_all(context->socket, (const char *)first, (int)first_length)) &&
+              (!second_length || send_all(context->socket, (const char *)second, (int)second_length));
     __atomic_store_n(&g_send_lock, 0, __ATOMIC_RELEASE);
-    return ok;
+    return ok && current_udp_event(context->id) == context;
 }
 
-/* Nested SDK calls made by ExitLag while the IPC thread is inside udpSend or
-   udpReceive. They are one-way records: the helper consumes them before the
-   final callback reply. The export's configured SDK status remains authoritative
-   and is included in the record. */
-static void report_udp_post(unsigned int api, ENDPOINT_ID id, int status,
+static bool prepare_udp_post(const unsigned char *remote, const char *buffer, int length,
+                              NF_UDP_OPTIONS __unaligned *options, unsigned char wire[28],
+                              unsigned int &options_length)
+{
+    options_length = 0;
+    if (options) {
+        if (trace::readable_bytes(options, 8) != 8 ||
+            options->optionsLength < 0 || options->optionsLength > 4096) return false;
+        options_length = (unsigned int)options->optionsLength;
+        if (trace::readable_bytes(options, 8u + options_length) != 8u + options_length) return false;
+    }
+    if (!remote || trace::readable_bytes(remote, 4) != 4) return false;
+    unsigned int family = exl_socket_attribution::endpoint_family(remote, 4);
+    // sockaddr_in's sin_zero is padding, not a routing field. Do not copy
+    // potentially uninitialized caller padding into IPC or reject it as policy.
+    unsigned int remote_length = family == 2 ? 8u : family == 23 ? 28u : 0u;
+    if (!remote_length || trace::readable_bytes(remote, remote_length) != remote_length ||
+        !exl_udp_validation::valid_post_arguments(remote, buffer, length, (int)options_length) ||
+        (length && trace::readable_bytes(buffer, (unsigned int)length) != (unsigned int)length)) return false;
+    return exl_udp_validation::canonical_post_remote(remote, remote_length, wire, 28);
+}
+
+// SDK posts are valid only on the current synchronous callback thread. They
+// carry that callback's tag and session; async or endpoint-mismatched calls
+// explicitly fail instead of borrowing another thread's active event.
+static bool report_udp_post(unsigned int api, ENDPOINT_ID id, int status,
                             const unsigned char *remote, const char *buffer, int length,
                             NF_UDP_OPTIONS __unaligned *options)
 {
-    SOCKET s = g_socket;
-    if (s == INVALID_SOCKET || !remote || !buffer || length < 0) return;
-    unsigned int options_length = 0;
-    unsigned int option_flags = 0;
-    const void *option_bytes = 0;
-    if (options) {
-        option_flags = options->flags;
-        if (options->optionsLength > 0 && options->optionsLength <= 4096) {
-            options_length = (unsigned int)options->optionsLength;
-            option_bytes = options->options;
-        }
-    }
-    if ((unsigned int)length > 65535) return;
+    udp_event_context *context = current_udp_event(id);
+    unsigned char wire[28]; unsigned int options_length;
+    if (!context || (api == EXL_UDP_API_POST_SEND ? context->direction != EXL_DIR_OUT :
+                     api == EXL_UDP_API_POST_RECEIVE ? context->direction != EXL_DIR_IN : true) ||
+        !prepare_udp_post(remote, buffer, length, options, wire, options_length)) return false;
     exl_udp_post event;
-    event.event_tag = id == g_udp_event_id ? g_udp_event_tag : 0;
+    event.event_tag = context->tag;
     event.endpoint_id = id; event.api = api; event.status = status;
-    for (int i = 0; i < 28; ++i) event.remote_address[i] = remote[i];
-    event.option_flags = option_flags; event.options_length = options_length;
+    for (int i = 0; i < 28; ++i) event.remote_address[i] = wire[i];
+    event.option_flags = options ? options->flags : 0; event.options_length = options_length;
     event.payload_length = (unsigned int)length;
-    if (send_message_parts(s, EXL_MSG_UDP_POST, &event, sizeof(event),
-                           option_bytes, options_length, buffer, (unsigned int)length))
-        if (event.event_tag) ++g_udp_post_count;
+    if (!send_udp_message_parts(context, EXL_MSG_UDP_POST, &event, sizeof(event),
+             options_length ? options->options : 0, options_length, buffer, (unsigned int)length)) return false;
+    ++context->post_count;
+    return true;
 }
 
-static void report_udp_state(unsigned int api, ENDPOINT_ID id, int status,
+static bool report_udp_state(unsigned int api, ENDPOINT_ID id, int status,
                              unsigned int value, const void *data, unsigned int data_length)
 {
-    SOCKET s = g_socket;
-    if (s == INVALID_SOCKET || data_length > 128) return;
+    udp_event_context *context = current_udp_event(id);
+    if (!context || data_length > 128 || (data_length &&
+        (!data || trace::readable_bytes(data, data_length) != data_length))) return false;
     exl_udp_state event;
-    event.event_tag = id == g_udp_event_id ? g_udp_event_tag : 0;
+    event.event_tag = context->tag;
     event.endpoint_id = id; event.api = api;
     event.status = status; event.value = value; event.data_length = data_length;
-    if (send_message_parts(s, EXL_MSG_UDP_STATE, &event, sizeof(event),
-                           data, data_length, 0, 0)) {
-        if (event.event_tag) {
-            if (api == EXL_UDP_API_ADD_REMOTE_RULE) ++g_udp_rule_count;
-            else ++g_udp_control_count;
-        }
-    }
+    if (!send_udp_message_parts(context, EXL_MSG_UDP_STATE, &event, sizeof(event),
+                                 data, data_length, 0, 0)) return false;
+    if (api == EXL_UDP_API_ADD_REMOTE_RULE) ++context->rule_count;
+    else ++context->control_count;
+    return true;
 }
 
 
+// Both owner-table APIs write before decoding. Keep their storage private to
+// this worker even while an older, unjoined nf_free worker is unwinding.
+static const unsigned long OWNER_TABLE_CAPACITY = 512u * 1024u;
+static const unsigned long OWNER_TABLE_OFFSET = (EXL_MAX_PAYLOAD * 2u + 65535u + 15u) & ~15u;
+static unsigned char *worker_owner_table()
+{
+    if (__atomic_load_n(&g_udp_tls_state, __ATOMIC_ACQUIRE) != 2) return 0;
+    udp_event_context *transport = (udp_event_context *)TlsGetValue(g_udp_tls);
+    if (!transport || !transport->owner_table ||
+        !__atomic_load_n(&g_running, __ATOMIC_ACQUIRE) ||
+        transport->session != __atomic_load_n(&g_udp_session, __ATOMIC_ACQUIRE) ||
+        transport->socket != __atomic_load_n(&g_socket, __ATOMIC_ACQUIRE)) return 0;
+    return transport->owner_table;
+}
+
 // ---- flow -> owning Windows PID -------------------------------------------
-#pragma pack(push, 4)
-struct MIB_TCPROW_OWNER_PID {
-    unsigned long state, localAddr, localPort, remoteAddr, remotePort, owningPid;
-};
-struct MIB_TCP6ROW_OWNER_PID {
-    unsigned char localAddr[16]; unsigned long localScope, localPort;
-    unsigned char remoteAddr[16]; unsigned long remoteScope, remotePort;
-    unsigned long state, owningPid;
-};
-struct MIB_UDPROW_OWNER_PID {
-    unsigned long localAddr, localPort, owningPid;
-};
-struct MIB_UDP6ROW_OWNER_PID {
-    unsigned char localAddr[16]; unsigned long localScope, localPort, owningPid;
-};
-#pragma pack(pop)
 #define TCP_TABLE_OWNER_PID_ALL 5
 #define UDP_TABLE_OWNER_PID 1
 #define AF_INET_  2
 #define AF_INET6_ 23
 
-// sockaddr form used on the wire: family(2) port(2, network order) then address.
-static unsigned int owning_windows_pid(const unsigned char *local, const unsigned char *remote)
-{
-    static unsigned char buffer[512 * 1024];
-    unsigned short family = (unsigned short)(local[0] | (local[1] << 8));
-    unsigned short local_port_net = (unsigned short)((local[2] << 8) | local[3]);
-    unsigned long size = sizeof(buffer);
+static_assert(sizeof(unsigned long) == sizeof(exl_socket_attribution::u32),
+              "iphlpapi DWORD argument must retain the Windows ABI");
 
-    if (family == AF_INET_) {
-        if (GetExtendedTcpTable(buffer, &size, 0, AF_INET_, TCP_TABLE_OWNER_PID_ALL, 0)) return 0;
-        unsigned long count = *(const unsigned long *)buffer;
-        const MIB_TCPROW_OWNER_PID *rows = (const MIB_TCPROW_OWNER_PID *)(buffer + 4);
-        for (unsigned long i = 0; i < count; ++i) {
-            unsigned short port = (unsigned short)(((rows[i].localPort & 0xff) << 8) | ((rows[i].localPort >> 8) & 0xff));
-            if (port != local_port_net) continue;
-            const unsigned char *a = (const unsigned char *)&rows[i].localAddr;
-            if (a[0] == local[4] && a[1] == local[5] && a[2] == local[6] && a[3] == local[7])
-                return (unsigned int)rows[i].owningPid;
-        }
-        return 0;
-    }
-    if (family == AF_INET6_) {
-        if (GetExtendedTcpTable(buffer, &size, 0, AF_INET6_, TCP_TABLE_OWNER_PID_ALL, 0)) return 0;
-        unsigned long count = *(const unsigned long *)buffer;
-        const MIB_TCP6ROW_OWNER_PID *rows = (const MIB_TCP6ROW_OWNER_PID *)(buffer + 4);
-        for (unsigned long i = 0; i < count; ++i) {
-            unsigned short port = (unsigned short)(((rows[i].localPort & 0xff) << 8) | ((rows[i].localPort >> 8) & 0xff));
-            if (port != local_port_net) continue;
-            bool same = true;
-            for (int b = 0; b < 16; ++b) if (rows[i].localAddr[b] != local[8 + b]) { same = false; break; }
-            if (same) return (unsigned int)rows[i].owningPid;
-        }
-        return 0;
-    }
-    return 0;
+static exl_socket_attribution::owner_result query_windows_tcp_owner(
+    unsigned char *buffer, unsigned long capacity, unsigned int family,
+    const unsigned char *local, const unsigned char *remote, bool mapped)
+{
+    unsigned long size = capacity;
+    if (GetExtendedTcpTable(buffer, &size, 0, family, TCP_TABLE_OWNER_PID_ALL, 0))
+        return exl_socket_attribution::result(exl_socket_attribution::owner_unavailable);
+    if (mapped)
+        return exl_socket_attribution::lookup_tcp_mapped_owner(buffer, capacity, size,
+                                                              local, 28, remote, 28);
+    return exl_socket_attribution::lookup_tcp_owner(buffer, capacity, size,
+                                                   family, local, 28, remote, 28);
 }
 
-/* UDP has no remote tuple in the owner table. Prefer an exact local-address
-   match, but accept an ANY-bound socket on the same port: sendto() packets carry
-   the selected interface address even when the application bound 0.0.0.0. */
-static unsigned int owning_windows_udp_pid(const unsigned char *local)
+// Endpoints use Windows sockaddr layouts; the portable decoder checks the
+// complete tuple and returned table span before choosing a Windows PID.
+static exl_socket_attribution::owner_result owning_windows_pid(
+    const unsigned char *local, const unsigned char *remote)
 {
-    static unsigned char buffer[512 * 1024];
-    unsigned short family = (unsigned short)(local[0] | (local[1] << 8));
-    unsigned short local_port_net = (unsigned short)((local[2] << 8) | local[3]);
-    unsigned long size = sizeof(buffer);
-    unsigned int wildcard_pid = 0;
-
-    if (family == AF_INET_) {
-        if (GetExtendedUdpTable(buffer, &size, 0, AF_INET_, UDP_TABLE_OWNER_PID, 0)) return 0;
-        unsigned long count = *(const unsigned long *)buffer;
-        const MIB_UDPROW_OWNER_PID *rows = (const MIB_UDPROW_OWNER_PID *)(buffer + 4);
-        for (unsigned long i = 0; i < count; ++i) {
-            unsigned short port = (unsigned short)(((rows[i].localPort & 0xff) << 8) | ((rows[i].localPort >> 8) & 0xff));
-            if (port != local_port_net) continue;
-            const unsigned char *a = (const unsigned char *)&rows[i].localAddr;
-            if (a[0] == local[4] && a[1] == local[5] && a[2] == local[6] && a[3] == local[7])
-                return (unsigned int)rows[i].owningPid;
-            if (!rows[i].localAddr) wildcard_pid = (unsigned int)rows[i].owningPid;
-        }
-        return wildcard_pid;
-    }
-    if (family == AF_INET6_) {
-        if (GetExtendedUdpTable(buffer, &size, 0, AF_INET6_, UDP_TABLE_OWNER_PID, 0)) return 0;
-        unsigned long count = *(const unsigned long *)buffer;
-        const MIB_UDP6ROW_OWNER_PID *rows = (const MIB_UDP6ROW_OWNER_PID *)(buffer + 4);
-        for (unsigned long i = 0; i < count; ++i) {
-            unsigned short port = (unsigned short)(((rows[i].localPort & 0xff) << 8) | ((rows[i].localPort >> 8) & 0xff));
-            if (port != local_port_net) continue;
-            bool same = true, any = true;
-            for (int b = 0; b < 16; ++b) {
-                if (rows[i].localAddr[b] != local[8 + b]) same = false;
-                if (rows[i].localAddr[b]) any = false;
-            }
-            if (same) return (unsigned int)rows[i].owningPid;
-            if (any) wildcard_pid = (unsigned int)rows[i].owningPid;
-        }
-        return wildcard_pid;
-    }
-    return 0;
+    unsigned char *buffer = worker_owner_table();
+    if (!buffer) return exl_socket_attribution::result(exl_socket_attribution::owner_invalid);
+    unsigned int family = exl_socket_attribution::endpoint_family(local, 28);
+    if (!exl_socket_attribution::valid_endpoint(local, 28, family) ||
+        !exl_socket_attribution::valid_endpoint(remote, 28, family))
+        return exl_socket_attribution::result(exl_socket_attribution::owner_invalid);
+    exl_socket_attribution::owner_result exact = query_windows_tcp_owner(
+        buffer, OWNER_TABLE_CAPACITY, family, local, remote, false);
+    if (family != AF_INET_ ||
+        (exact.status != exl_socket_attribution::owner_none &&
+         exact.status != exl_socket_attribution::owner_unavailable)) return exact;
+    // A dual-stack socket can be listed under IPv6 while its packets are IPv4.
+    // Query that table only after no exact IPv4 owner was obtained, constructing
+    // both explicit mapped endpoints with zero scopes. Runtime Wine behavior is
+    // not assumed by the native fixtures; errors retain their unavailable state.
+    exl_socket_attribution::owner_result mapped = query_windows_tcp_owner(
+        buffer, OWNER_TABLE_CAPACITY, AF_INET6_, local, remote, true);
+    return exl_socket_attribution::combine_tcp_owners(exact, mapped);
 }
 
-struct udp_owner_entry { unsigned __int64 id; unsigned int pid; };
-static udp_owner_entry g_udp_owners[1024];
-
-static void remember_udp_owner(unsigned __int64 id, unsigned int pid)
+static exl_socket_attribution::owner_result query_windows_udp_owner(
+    unsigned char *buffer, unsigned long capacity, unsigned int family,
+    const unsigned char *local, bool mapped)
 {
-    unsigned int slot = (unsigned int)(id & 1023);
-    g_udp_owners[slot].id = id;
-    g_udp_owners[slot].pid = pid;
+    unsigned long size = capacity;
+    if (GetExtendedUdpTable(buffer, &size, 0, family, UDP_TABLE_OWNER_PID, 0))
+        return exl_socket_attribution::result(exl_socket_attribution::owner_unavailable);
+    return mapped ? exl_socket_attribution::lookup_udp_mapped_owner(buffer, capacity, size, local, 28) :
+        exl_socket_attribution::lookup_udp_owner(buffer, capacity, size, family, local, 28);
 }
 
-static unsigned int known_udp_owner(unsigned __int64 id)
+static exl_socket_attribution::owner_result owning_windows_udp_pid(const unsigned char *local)
 {
-    const udp_owner_entry &entry = g_udp_owners[(unsigned int)(id & 1023)];
-    return entry.id == id ? entry.pid : 0;
+    unsigned char *buffer = worker_owner_table();
+    if (!buffer) return exl_socket_attribution::result(exl_socket_attribution::owner_invalid);
+    unsigned int family = exl_socket_attribution::endpoint_family(local, 28);
+    if (!exl_socket_attribution::valid_endpoint(local, 28, family))
+        return exl_socket_attribution::result(exl_socket_attribution::owner_invalid);
+    exl_socket_attribution::owner_result exact = query_windows_udp_owner(
+        buffer, OWNER_TABLE_CAPACITY, family, local, false);
+    if (family != AF_INET_) return exact;
+    // Check both compatible address families. Distinct owners or an ambiguous
+    // IPv6 ANY bind must not be hidden by an exact IPv4 row.
+    exl_socket_attribution::owner_result mapped = query_windows_udp_owner(
+        buffer, OWNER_TABLE_CAPACITY, AF_INET6_, local, true);
+    return exl_socket_attribution::combine_tcp_owners(exact, mapped);
 }
 
 // Invokes ExitLag's real tcpConnectRequest (vtable slot 2) with a structure
@@ -1579,9 +1565,21 @@ static void handle_tcp_connect(const exl_tcp_connect_req &req, exl_tcp_connect_r
     // Prefer the real Windows owner: that is what ExitLag expects, and it lets
     // nf_getProcessNameFromKernel answer from OpenProcess directly. Only fall
     // back to the helper's Linux PID when the flow belongs to a non-Wine process.
-    unsigned int windows_pid = owning_windows_pid(req.local_address, req.remote_address);
-    unsigned int process_id = windows_pid ? windows_pid : req.process_id;
-    if (!windows_pid) remember_linux_pid(process_id);
+    exl_tcp_callback_policy::passthrough_reply(req, reply);
+    exl_socket_attribution::owner_result windows_owner =
+        owning_windows_pid(req.local_address, req.remote_address);
+    exl_tcp_callback_policy::process_selection selected =
+        exl_tcp_callback_policy::select_process(windows_owner, req.process_id);
+    unsigned int process_id = selected.pid;
+    if (!process_id || !remember_process_pid(process_id, selected.origin) ||
+        process_pid_origin(process_id) != selected.origin) {
+        trace::line rejected; trace::prefix(rejected, "ipc.tcpConnectRequest.skipped");
+        rejected.text(" reason=unverified-or-ambiguous-owner windows_status=");
+        rejected.decimal((unsigned int)windows_owner.status);
+        trace::finish(rejected);
+        return;
+    }
+    bool windows_pid = selected.origin == pid_windows;
 
     reply.tag = req.tag; reply.mutated_flag = 0; reply.mutated_remote = 0;
     reply.reserved[0] = reply.reserved[1] = 0;
@@ -1616,6 +1614,16 @@ static void handle_tcp_connect(const exl_tcp_connect_req &req, exl_tcp_connect_r
 
     ((cb_id_ptr)inject::slot(2))(inject::g_handler, req.endpoint_id, &info);
 
+    if (process_pid_origin(process_id) != selected.origin) {
+        // A concurrent SDK/event observation exposed a cross-domain collision.
+        // Discard this callback mutation rather than apply an ambiguous name.
+        exl_tcp_callback_policy::passthrough_reply(req, reply);
+        trace::line rejected; trace::prefix(rejected, "ipc.tcpConnectRequest.skipped");
+        rejected.text(" reason=pid-domain-changed-during-callback");
+        trace::finish(rejected);
+        return;
+    }
+
     trace::line post; trace::prefix(post, "ipc.tcpConnectRequest.return");
     post.text(" tag="); post.hex(req.tag);
     post.text(" after: filteringFlag="); post.hex(info.filteringFlag);
@@ -1632,33 +1640,22 @@ static void handle_tcp_connect(const exl_tcp_connect_req &req, exl_tcp_connect_r
     trace::finish(post);
 }
 
-static unsigned int effective_udp_pid(unsigned __int64 id, unsigned int linux_pid,
-                                      const unsigned char *local, bool refresh)
+static unsigned int effective_udp_pid(unsigned int linux_pid, const unsigned char *local)
 {
-    unsigned int pid = refresh ? owning_windows_udp_pid(local) : known_udp_owner(id);
-    if (!pid) pid = owning_windows_udp_pid(local);
-    if (!pid) { pid = linux_pid; remember_linux_pid(pid); }
-    if (pid) remember_udp_owner(id, pid);
-    return pid;
-}
-
-static void begin_udp_event(unsigned __int64 tag, unsigned __int64 id)
-{
-    g_udp_event_tag = tag; g_udp_event_id = id;
-    g_udp_post_count = 0; g_udp_rule_count = 0; g_udp_control_count = 0;
-}
-
-static void end_udp_event()
-{
-    g_udp_event_tag = 0; g_udp_event_id = 0;
+    exl_socket_attribution::owner_result windows_owner = owning_windows_udp_pid(local);
+    exl_tcp_callback_policy::process_selection selected =
+        exl_tcp_callback_policy::select_process(windows_owner, linux_pid);
+    if (!selected.pid || !remember_process_pid(selected.pid, selected.origin) ||
+        process_pid_origin(selected.pid) != selected.origin) return 0;
+    return selected.pid;
 }
 
 static void handle_udp_lifecycle(const exl_udp_lifecycle_req &req,
                                  exl_udp_lifecycle_reply &reply, unsigned int slot_index,
                                  const char *name)
 {
-    unsigned int process_id = effective_udp_pid(req.endpoint_id, req.process_id,
-                                                 req.local_address, slot_index == 9);
+    unsigned int process_id = effective_udp_pid(req.process_id, req.local_address);
+    pid_origin domain = process_pid_origin(process_id);
     NF_UDP_CONN_INFO info;
     info.processId = process_id; info.ip_family = req.ip_family;
     for (int i = 0; i < 28; ++i) info.localAddress[i] = req.local_address[i];
@@ -1667,20 +1664,31 @@ static void handle_udp_lifecycle(const exl_udp_lifecycle_req &req,
     trace::line out; trace::prefix(out, name);
     out.text(" tag="); out.hex(req.tag); out.text(" id="); out.hex(req.endpoint_id);
     out.text(" processId="); out.decimal(process_id);
-    out.text(process_id != req.process_id ? "(windows)" : "(linux)");
+    out.text(process_pid_origin(process_id) == pid_windows ? "(windows)" : "(linux)");
     out.text(" local="); trace::sockaddr_text(out, info.localAddress);
     out.text(" beforeRaw="); out.byte_array((const unsigned char *)&info, sizeof(info));
 
     reply.tag = req.tag; reply.process_id = process_id; reply.mutated_info = 0;
+    reply.ip_family = req.ip_family;
+    for (int i = 0; i < 28; ++i) reply.local_address[i] = req.local_address[i];
     reply.reserved[0] = reply.reserved[1] = reply.reserved[2] = 0;
-    if (!inject::g_handler) {
+    if (!process_id) {
+        out.text(" verdict=unresolved-pid"); trace::finish(out);
+        reply.verdict = EXL_VERDICT_NO_HANDLER;
+    } else if (!inject::g_handler) {
         out.text(" verdict=no-handler"); trace::finish(out);
         reply.verdict = EXL_VERDICT_NO_HANDLER;
     } else {
         trace::finish(out);
-        begin_udp_event(req.tag, req.endpoint_id);
+        if (domain != pid_linux && domain != pid_windows) {
+            reply.verdict = EXL_VERDICT_NO_HANDLER; return;
+        }
+        udp_event_scope event(req.tag, req.endpoint_id);
+        if (!event.valid()) { reply.verdict = EXL_VERDICT_NO_HANDLER; return; }
         ((cb_id_ptr)inject::slot(slot_index))(inject::g_handler, req.endpoint_id, &info);
-        end_udp_event();
+        if (process_pid_origin(process_id) != domain) {
+            reply.verdict = EXL_VERDICT_NO_HANDLER; return;
+        }
         reply.verdict = EXL_VERDICT_UNCHANGED;
         const unsigned char *a = (const unsigned char *)&before;
         const unsigned char *b = (const unsigned char *)&info;
@@ -1697,8 +1705,8 @@ static void handle_udp_lifecycle(const exl_udp_lifecycle_req &req,
 
 static void handle_udp_connect(const exl_udp_connect_req &req, exl_udp_connect_reply &reply)
 {
-    unsigned int process_id = effective_udp_pid(req.endpoint_id, req.process_id,
-                                                 req.local_address, true);
+    unsigned int process_id = effective_udp_pid(req.process_id, req.local_address);
+    pid_origin domain = process_pid_origin(process_id);
     NF_UDP_CONN_REQUEST info;
     info.filteringFlag = req.filtering_flag; info.processId = process_id; info.ip_family = req.ip_family;
     for (int i = 0; i < 28; ++i) {
@@ -1709,23 +1717,34 @@ static void handle_udp_connect(const exl_udp_connect_req &req, exl_udp_connect_r
     trace::line out; trace::prefix(out, "ipc.udpConnectRequest");
     out.text(" tag="); out.hex(req.tag); out.text(" id="); out.hex(req.endpoint_id);
     out.text(" processId="); out.decimal(process_id);
-    out.text(process_id != req.process_id ? "(windows)" : "(linux)");
+    out.text(process_pid_origin(process_id) == pid_windows ? "(windows)" : "(linux)");
     out.text(" filteringFlag="); out.hex(info.filteringFlag);
     out.text(" local="); trace::sockaddr_text(out, info.localAddress);
     out.text(" remote="); trace::sockaddr_text(out, info.remoteAddress);
     out.text(" beforeRaw="); out.byte_array((const unsigned char *)&info, sizeof(info));
 
     reply.tag = req.tag; reply.process_id = process_id;
+    reply.filtering_flag = req.filtering_flag;
+    for (int i = 0; i < 28; ++i) reply.remote_address[i] = req.remote_address[i];
     reply.mutated_flag = 0; reply.mutated_remote = 0;
     reply.reserved[0] = reply.reserved[1] = 0;
-    if (!inject::g_handler) {
+    if (!process_id) {
+        out.text(" verdict=unresolved-pid"); trace::finish(out);
+        reply.verdict = EXL_VERDICT_NO_HANDLER;
+    } else if (!inject::g_handler) {
         out.text(" verdict=no-handler"); trace::finish(out);
         reply.verdict = EXL_VERDICT_NO_HANDLER;
     } else {
         trace::finish(out);
-        begin_udp_event(req.tag, req.endpoint_id);
+        if (domain != pid_linux && domain != pid_windows) {
+            reply.verdict = EXL_VERDICT_NO_HANDLER; return;
+        }
+        udp_event_scope event(req.tag, req.endpoint_id);
+        if (!event.valid()) { reply.verdict = EXL_VERDICT_NO_HANDLER; return; }
         ((cb_id_ptr)inject::slot(10))(inject::g_handler, req.endpoint_id, &info);
-        end_udp_event();
+        if (process_pid_origin(process_id) != domain) {
+            reply.verdict = EXL_VERDICT_NO_HANDLER; return;
+        }
         if (info.filteringFlag != before.filteringFlag) reply.mutated_flag = 1;
         for (int i = 0; i < 28; ++i)
             if (info.remoteAddress[i] != before.remoteAddress[i]) { reply.mutated_remote = 1; break; }
@@ -1747,14 +1766,24 @@ static void handle_udp_datagram(exl_udp_datagram_req &req, unsigned int frame_le
     reply.tag = req.tag; reply.verdict = EXL_VERDICT_NO_HANDLER;
     reply.post_count = reply.remote_rule_count = reply.control_count = 0;
     reply.mutated_remote = reply.mutated_payload = reply.mutated_options = reply.reserved = 0;
-    unsigned int trailing = frame_length >= sizeof(req) ? frame_length - (unsigned int)sizeof(req) : 0;
-    if (req.options_length > trailing || req.payload_length > trailing - req.options_length ||
-        req.options_length > 4096 || req.payload_length > 65535) return;
+    if (!exl_udp_validation::valid_datagram(req, frame_length)) return;
+    unsigned int process_id = effective_udp_pid(req.process_id, req.local_address);
+    pid_origin domain = process_pid_origin(process_id);
+    if (!process_id) {
+        trace::line out; trace::prefix(out, "ipc.udpDatagram");
+        out.text(" id="); out.hex(req.endpoint_id); out.text(" verdict=unresolved-pid");
+        trace::finish(out); return;
+    }
 
     unsigned char *base = (unsigned char *)&req;
     unsigned char *option_bytes = base + sizeof(req);
     char *payload = (char *)(option_bytes + req.options_length);
-    static unsigned char payload_before[65535];
+    udp_event_context *transport = __atomic_load_n(&g_udp_tls_state, __ATOMIC_ACQUIRE) == 2 ?
+        (udp_event_context *)TlsGetValue(g_udp_tls) : 0;
+    if (!transport || !transport->scratch ||
+        transport->session != __atomic_load_n(&g_udp_session, __ATOMIC_ACQUIRE) ||
+        transport->socket != __atomic_load_n(&g_socket, __ATOMIC_ACQUIRE)) return;
+    unsigned char *payload_before = transport->scratch;
     volatile unsigned char *saved_payload = payload_before;
     const volatile unsigned char *source_payload = (const volatile unsigned char *)payload;
     for (unsigned int i = 0; i < req.payload_length; ++i) saved_payload[i] = source_payload[i];
@@ -1771,7 +1800,7 @@ static void handle_udp_datagram(exl_udp_datagram_req &req, unsigned int frame_le
 
     trace::line out; trace::prefix(out, req.direction == 2 ? "ipc.udpSend" : "ipc.udpReceive");
     out.text(" tag="); out.hex(req.tag); out.text(" id="); out.hex(req.endpoint_id);
-    out.text(" processId="); out.decimal(known_udp_owner(req.endpoint_id));
+    out.text(" processId="); out.decimal(process_id);
     out.text(" local="); trace::sockaddr_text(out, req.local_address);
     out.text(" remote="); trace::sockaddr_text(out, req.remote_address);
     out.text(" len="); out.decimal(req.payload_length); out.text(" payloadHead:");
@@ -1780,13 +1809,15 @@ static void handle_udp_datagram(exl_udp_datagram_req &req, unsigned int frame_le
     if (!inject::g_handler) { out.text(" verdict=no-handler"); trace::finish(out); return; }
     trace::finish(out);
 
-    begin_udp_event(req.tag, req.endpoint_id);
+    if (domain != pid_linux && domain != pid_windows) return;
+    udp_event_scope event(req.tag, req.endpoint_id, req.direction);
+    if (!event.valid()) return;
     unsigned int slot_index = req.direction == 2 ? 13 : 12;
     ((cb_udp_data)inject::slot(slot_index))(inject::g_handler, req.endpoint_id,
         req.remote_address, payload, (int)req.payload_length, (NF_UDP_OPTIONS *)&options);
-    reply.post_count = g_udp_post_count; reply.remote_rule_count = g_udp_rule_count;
-    reply.control_count = g_udp_control_count;
-    end_udp_event();
+    if (process_pid_origin(process_id) != domain) return;
+    reply.post_count = event.context.post_count; reply.remote_rule_count = event.context.rule_count;
+    reply.control_count = event.context.control_count;
     reply.verdict = EXL_VERDICT_UNCHANGED;
     for (int i = 0; i < 28; ++i)
         if (remote_before[i] != req.remote_address[i]) { reply.mutated_remote = 1; break; }
@@ -1809,28 +1840,6 @@ static void handle_udp_datagram(exl_udp_datagram_req &req, unsigned int frame_le
     trace::finish(post);
 }
 
-// "host:port" (ASCII) -> sockaddr_in. Only IPv4 loopback is expected.
-static bool parse_endpoint(const wchar_t *text, unsigned char *sockaddr_out)
-{
-    unsigned int octet[4] = {127, 0, 0, 1};
-    unsigned int port = 51900;
-    const wchar_t *p = text;
-    unsigned int value = 0; int index = 0; bool have_digits = false;
-    for (; *p && *p != L':'; ++p) {
-        if (*p >= L'0' && *p <= L'9') { value = value * 10 + (unsigned)(*p - L'0'); have_digits = true; }
-        else if (*p == L'.' && index < 3) { octet[index++] = value; value = 0; have_digits = false; }
-        else return false;
-    }
-    if (!have_digits || index != 3) return false;
-    octet[3] = value;
-    if (*p == L':') { port = 0; for (++p; *p >= L'0' && *p <= L'9'; ++p) port = port * 10 + (unsigned)(*p - L'0'); }
-    if (!port || port > 65535) return false;
-    for (int i = 0; i < 16; ++i) sockaddr_out[i] = 0;
-    sockaddr_out[0] = 2; sockaddr_out[1] = 0;                 /* AF_INET */
-    sockaddr_out[2] = (unsigned char)(port >> 8); sockaddr_out[3] = (unsigned char)port;
-    for (int i = 0; i < 4; ++i) sockaddr_out[4 + i] = (unsigned char)octet[i];
-    return true;
-}
 
 /*
  * Read this session's IPC token. The helper writes 64 hex characters to a file
@@ -1883,6 +1892,63 @@ static bool read_session_token(unsigned char *out)
     return true;
 }
 
+static void socket_lock()
+{
+    while (__atomic_exchange_n(&g_socket_lock, 1, __ATOMIC_ACQUIRE)) Sleep(0);
+}
+
+static void publish_socket(SOCKET s)
+{
+    socket_lock();
+    __atomic_store_n(&g_socket, s, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_socket_lock, 0, __ATOMIC_RELEASE);
+}
+
+static void release_socket(SOCKET s)
+{
+    socket_lock();
+    __atomic_store_n(&g_socket, INVALID_SOCKET, __ATOMIC_RELEASE);
+    closesocket(s);
+    __atomic_store_n(&g_socket_lock, 0, __ATOMIC_RELEASE);
+}
+
+static void retry_pause()
+{
+    for (unsigned i = 0; i < 40 && __atomic_load_n(&g_running, __ATOMIC_ACQUIRE); ++i)
+        Sleep(50);
+}
+
+// Loopback is not a guarantee that SYN receives an answer: a local firewall
+// may silently drop it. Poll a nonblocking connect so nf_free can revoke it.
+static bool connect_cancellable(SOCKET s, const void *address)
+{
+    unsigned long nonblocking = 1;
+    if (ioctlsocket(s, (long)0x8004667eUL /* FIONBIO */, &nonblocking) != 0) return false;
+    bool connected = connect(s, address, 16) == 0;
+    if (!connected) {
+        int error = WSAGetLastError();
+        if (error != 10035 /* WSAEWOULDBLOCK */ && error != 10036 /* WSAEINPROGRESS */ &&
+            error != 10037 /* WSAEALREADY */) return false;
+    }
+    unsigned __int64 deadline = GetTickCount64() + 5000;
+    while (!connected && __atomic_load_n(&g_running, __ATOMIC_ACQUIRE) &&
+           GetTickCount64() < deadline) {
+        exl_fd_set writable; writable.count = 1; writable.sockets[0] = s;
+        exl_fd_set failed; failed.count = 1; failed.sockets[0] = s;
+        exl_timeval wait = {0, 100000};
+        int result = select(0, 0, &writable, &failed, &wait);
+        if (result < 0) return false;
+        if (result == 0) continue;
+        int error = -1, length = sizeof(error);
+        if (getsockopt(s, SOL_SOCKET_, 0x1007 /* SO_ERROR */, (char *)&error, &length) != 0 ||
+            length != sizeof(error) || error != 0 || failed.count != 0) return false;
+        connected = writable.count != 0;
+    }
+    if (!connected || !__atomic_load_n(&g_running, __ATOMIC_ACQUIRE)) return false;
+    nonblocking = 0;
+    return ioctlsocket(s, (long)0x8004667eUL, &nonblocking) == 0;
+}
+
 static DWORD WINAPI thread_main(void *)
 {
     wchar_t endpoint[128];
@@ -1890,21 +1956,28 @@ static DWORD WINAPI thread_main(void *)
     if (!size || size >= sizeof(endpoint) / sizeof(endpoint[0])) return 0;
 
     unsigned char address[16];
-    if (!parse_endpoint(endpoint, address)) {
+    if (!exl_ipc_validation::parse_loopback_endpoint(endpoint, address)) {
         trace::line bad; trace::prefix(bad, "ipc.config");
         bad.text(" error=bad-endpoint value="); bad.wide_ascii(endpoint, 128); trace::finish(bad);
         return 0;
     }
 
     char winsock_data[512];
-    WSAStartup(0x0202, winsock_data);
+    if (WSAStartup(0x0202, winsock_data) != 0) return 0;
 
-    while (g_running) {
+    // Receive bytes, UDP before-images and owner tables belong to this worker.
+    HANDLE heap = GetProcessHeap();
+    char *payload = (char *)HeapAlloc(heap, 0, OWNER_TABLE_OFFSET + OWNER_TABLE_CAPACITY);
+    if (!payload) { WSACleanup(); return 0; }
+
+    while (__atomic_load_n(&g_running, __ATOMIC_ACQUIRE)) {
         SOCKET s = socket(2 /*AF_INET*/, 1 /*SOCK_STREAM*/, 6 /*IPPROTO_TCP*/);
-        if (s == INVALID_SOCKET) { Sleep(2000); continue; }
-        if (connect(s, address, 16) == SOCKET_ERROR) {
-            closesocket(s);
-            Sleep(2000);           // helper absent: keep retrying, never block ExitLag
+        if (s == INVALID_SOCKET) { retry_pause(); continue; }
+        publish_socket(s);
+        if (!__atomic_load_n(&g_running, __ATOMIC_ACQUIRE)) { release_socket(s); break; }
+        if (!connect_cancellable(s, address)) {
+            release_socket(s);
+            retry_pause();         // helper absent: keep retrying, never block ExitLag
             continue;
         }
         int one = 1;
@@ -1917,7 +1990,17 @@ static DWORD WINAPI thread_main(void *)
         int io_timeout_ms = 5000;
         setsockopt(s, SOL_SOCKET_, SO_SNDTIMEO_, (const char *)&io_timeout_ms, sizeof(io_timeout_ms));
         setsockopt(s, SOL_SOCKET_, SO_RCVTIMEO_, (const char *)&io_timeout_ms, sizeof(io_timeout_ms));
-        g_socket = s;
+        unsigned __int64 session = __atomic_add_fetch(&g_udp_session, 1, __ATOMIC_ACQ_REL);
+        // Bind requests to this worker and this connection epoch.
+        udp_event_context transport = {};
+        transport.session = session; transport.socket = s;
+        transport.scratch = (unsigned char *)payload + EXL_MAX_PAYLOAD;
+        transport.resolve_buffer = payload + EXL_MAX_PAYLOAD + 65535u;
+        transport.owner_table = (unsigned char *)payload + OWNER_TABLE_OFFSET;
+        if (!ensure_udp_tls() || !TlsSetValue(g_udp_tls, &transport)) {
+            __atomic_add_fetch(&g_udp_session, 1, __ATOMIC_ACQ_REL);
+            release_socket(s); retry_pause(); continue;
+        }
 
         exl_hello hello; hello.version = EXL_PROTOCOL_VERSION;
         hello.shim_process_id = GetCurrentProcessId(); hello.capabilities = 0;
@@ -1926,7 +2009,11 @@ static DWORD WINAPI thread_main(void *)
         // it starts, so a cached one would be stale after a helper restart.
         bool have_token = read_session_token(hello.token);
         bool ok = have_token && send_message(s, EXL_MSG_HELLO, &hello, sizeof(hello));
-        if (!have_token) { closesocket(s); Sleep(2000); continue; }
+        if (!have_token) {
+            TlsSetValue(g_udp_tls, 0);
+            __atomic_add_fetch(&g_udp_session, 1, __ATOMIC_ACQ_REL);
+            release_socket(s); retry_pause(); continue;
+        }
 
         {
             trace::line out; trace::prefix(out, "ipc.connect");
@@ -1936,13 +2023,13 @@ static DWORD WINAPI thread_main(void *)
             trace::finish(out);
         }
 
-        static char payload[65536];
-        while (ok && g_running) {
+        while (ok && __atomic_load_n(&g_running, __ATOMIC_ACQUIRE)) {
             exl_header head;
             if (!recv_all(s, (char *)&head, (int)sizeof(head))) break;
-            if (head.magic != EXL_MAGIC || head.length > sizeof(payload)) break;
+            if (!exl_ipc_validation::valid_frame_header(head)) break;
             if (head.length && !recv_all(s, payload, (int)head.length)) break;
 
+            if (!__atomic_load_n(&g_running, __ATOMIC_ACQUIRE)) break;
             if (head.type == EXL_MSG_HELLO_ACK && head.length >= sizeof(exl_hello_ack)) {
                 const exl_hello_ack *ack = (const exl_hello_ack *)payload;
                 trace::line out; trace::prefix(out, "ipc.hello_ack");
@@ -1958,47 +2045,110 @@ static DWORD WINAPI thread_main(void *)
                 exl_tcp_connect_reply reply;
                 handle_tcp_connect(req, reply);
                 if (!send_message(s, EXL_MSG_TCP_CONNECT_REPLY, &reply, sizeof(reply))) break;
-            } else if ((head.type == EXL_MSG_UDP_CREATED_REQ || head.type == EXL_MSG_UDP_CLOSED_REQ) &&
-                       head.length >= sizeof(exl_udp_lifecycle_req)) {
+            } else if (head.type == EXL_MSG_UDP_CREATED_REQ || head.type == EXL_MSG_UDP_CLOSED_REQ) {
+                if (head.length != sizeof(exl_udp_lifecycle_req)) break;
                 const exl_udp_lifecycle_req &req = *(const exl_udp_lifecycle_req *)payload;
+                if (!exl_udp_validation::valid_lifecycle(req)) break;
                 exl_udp_lifecycle_reply reply;
                 bool created = head.type == EXL_MSG_UDP_CREATED_REQ;
                 handle_udp_lifecycle(req, reply, created ? 9u : 11u,
                                      created ? "ipc.udpCreated" : "ipc.udpClosed");
                 if (!send_message(s, created ? EXL_MSG_UDP_CREATED_REPLY : EXL_MSG_UDP_CLOSED_REPLY,
                                   &reply, sizeof(reply))) break;
-            } else if (head.type == EXL_MSG_UDP_CONNECT_REQ && head.length >= sizeof(exl_udp_connect_req)) {
+            } else if (head.type == EXL_MSG_UDP_CONNECT_REQ) {
+                if (head.length != sizeof(exl_udp_connect_req)) break;
                 const exl_udp_connect_req &req = *(const exl_udp_connect_req *)payload;
+                if (!exl_udp_validation::valid_connect(req)) break;
                 exl_udp_connect_reply reply;
                 handle_udp_connect(req, reply);
                 if (!send_message(s, EXL_MSG_UDP_CONNECT_REPLY, &reply, sizeof(reply))) break;
-            } else if (head.type == EXL_MSG_UDP_DATAGRAM_REQ && head.length >= sizeof(exl_udp_datagram_req)) {
+            } else if (head.type == EXL_MSG_UDP_DATAGRAM_REQ) {
+                if (head.length < sizeof(exl_udp_datagram_req)) break;
                 exl_udp_datagram_req &req = *(exl_udp_datagram_req *)payload;
+                if (!exl_udp_validation::valid_datagram(req, head.length)) break;
                 exl_udp_datagram_reply reply;
                 handle_udp_datagram(req, head.length, reply);
                 if (!send_message(s, EXL_MSG_UDP_DATAGRAM_REPLY, &reply, sizeof(reply))) break;
             }
         }
 
-        g_socket = INVALID_SOCKET;
-        closesocket(s);
+        TlsSetValue(g_udp_tls, 0);
+        __atomic_add_fetch(&g_udp_session, 1, __ATOMIC_ACQ_REL);
+        release_socket(s);
         { trace::line out; trace::prefix(out, "ipc.disconnect"); trace::finish(out); }
-        if (g_running) Sleep(2000);
+        retry_pause();
     }
+    HeapFree(heap, 0, payload);
+    WSACleanup();
     return 0;
 }
 
-static void start()
+static bool start()
 {
     wchar_t endpoint[128];
-    if (!GetEnvironmentVariableW(L"EXITLAG_NETD", endpoint, sizeof(endpoint) / sizeof(endpoint[0]))) return;
-    g_running = 1;
-    CreateThread(0, 0, thread_main, 0, 0, 0);
+    if (!GetEnvironmentVariableW(L"EXITLAG_NETD", endpoint, sizeof(endpoint) / sizeof(endpoint[0]))) return true;
+    __atomic_store_n(&g_running, 1, __ATOMIC_RELEASE);
+    g_thread = CreateThread(0, 0, thread_main, 0, 0, &g_thread_id);
+    if (!g_thread) __atomic_store_n(&g_running, 0, __ATOMIC_RELEASE);
+    return g_thread != 0;
 }
 
-static void stop() { g_running = 0; }
+static void stop()
+{
+    __atomic_store_n(&g_running, 0, __ATOMIC_RELEASE);
+    __atomic_add_fetch(&g_udp_session, 1, __ATOMIC_ACQ_REL);
+    // Only the worker closes sockets. Serialize shutdown with its close so a
+    // reused numeric handle can never refer to an unrelated application socket.
+    socket_lock();
+    SOCKET s = __atomic_load_n(&g_socket, __ATOMIC_ACQUIRE);
+    if (s != INVALID_SOCKET) shutdown(s, 2 /* SD_BOTH */);
+    __atomic_store_n(&g_socket_lock, 0, __ATOMIC_RELEASE);
+}
 
 } // namespace ipc
+
+namespace runtime {
+static exl_worker_lifecycle::state lifecycle;
+struct hooks {
+    NF_EventHandler *handler;
+    void pause() { Sleep(0); }
+    bool start() {
+        inject::g_handler = handler;
+        return inject::start(handler) && ipc::start();
+    }
+    void revoke() { inject::stop(); ipc::stop(); }
+    bool on_worker() {
+        DWORD self = GetCurrentThreadId();
+        return (inject::g_thread && inject::g_thread_id == self &&
+                WaitForSingleObject(inject::g_thread, 0) != 0) ||
+               (ipc::g_thread && ipc::g_thread_id == self &&
+                WaitForSingleObject(ipc::g_thread, 0) != 0);
+    }
+    bool finished() {
+        return (!inject::g_thread || WaitForSingleObject(inject::g_thread, 0) == 0) &&
+               (!ipc::g_thread || WaitForSingleObject(ipc::g_thread, 0) == 0);
+    }
+    void join() {
+        if (inject::g_thread) WaitForSingleObject(inject::g_thread, 0xffffffffUL);
+        if (ipc::g_thread) WaitForSingleObject(ipc::g_thread, 0xffffffffUL);
+    }
+    void reap() {
+        if (inject::g_thread) CloseHandle(inject::g_thread);
+        if (ipc::g_thread) CloseHandle(ipc::g_thread);
+        inject::g_thread = ipc::g_thread = 0;
+        inject::g_thread_id = ipc::g_thread_id = 0;
+        inject::g_handler = 0;
+    }
+};
+static bool start(NF_EventHandler *handler) {
+    hooks h = {handler};
+    return exl_worker_lifecycle::start(lifecycle, h);
+}
+static void stop() {
+    hooks h = {0};
+    exl_worker_lifecycle::stop(lifecycle, h);
+}
+} // namespace runtime
 
 #define NFAPI_EXPORT __declspec(dllexport)
 
@@ -2012,13 +2162,24 @@ NFAPI_EXPORT int nf_getProcessNameFromKernel(unsigned long process_id, wchar_t *
     // The real driver answers from the kernel; here the answer is taken from the
     // OS for the same PID. No name is invented: if the process cannot be opened
     // or queried, the call still fails.
+    ipc::pid_origin origin = ipc::process_pid_origin(process_id);
+    if (origin == ipc::pid_ambiguous) {
+        if (buffer && length) buffer[0] = 0;
+        out.text(" source=ambiguous policy=fail");
+        trace::result(out, 0); trace::finish(out); return 0;
+    }
     if (!trace::policy_succeeds("nf_getProcessNameFromKernel") || !buffer || !length) {
         out.text(" policy=fail"); trace::result(out, 0); trace::finish(out); return 0;
     }
     // A PID reported by the helper is a Linux PID and must be resolved there;
     // calling OpenProcess with it could name an unrelated Wine process.
-    if (ipc::is_linux_pid(process_id)) {
+    if (origin == ipc::pid_linux) {
         int ok = ipc::resolve_linux_pid(process_id, buffer, length);
+        // A second domain can be recorded while the helper is answering. Never
+        // return a name after the numeric PID has become ambiguous.
+        if (ipc::process_pid_origin(process_id) != ipc::pid_linux) {
+            buffer[0] = 0; ok = 0;
+        }
         out.text(" source=helper policy=succeed");
         if (ok) { out.text(" name="); out.wide_ascii(buffer, 260); }
         else out.text(" name=unresolved");
@@ -2026,12 +2187,19 @@ NFAPI_EXPORT int nf_getProcessNameFromKernel(unsigned long process_id, wchar_t *
     }
     HANDLE process = OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */, 0, process_id);
     if (!process) {
+        if (ipc::process_pid_origin(process_id) == ipc::pid_ambiguous) buffer[0] = 0;
         out.text(" source=windows policy=succeed openProcess=failed");
         trace::result(out, 0); trace::finish(out); return 0;
     }
     DWORD written = length;
     BOOL ok = QueryFullProcessImageNameW(process, 0, buffer, &written);
     CloseHandle(process);
+    ipc::pid_origin current_origin = ipc::process_pid_origin(process_id);
+    if (current_origin == ipc::pid_linux || current_origin == ipc::pid_ambiguous) {
+        buffer[0] = 0;
+        out.text(" source=changed-domain policy=fail");
+        trace::result(out, 0); trace::finish(out); return 0;
+    }
     if (!ok) {
         out.text(" policy=succeed queryImageName=failed");
         trace::result(out, 0); trace::finish(out); return 0;
@@ -2126,8 +2294,8 @@ NFAPI_EXPORT NF_STATUS nf_setUDPFlowCtl(ENDPOINT_ID id, unsigned int handle)
     trace::line out; trace::prefix(out, "nf_setUDPFlowCtl"); out.text(" id="); out.hex(id);
     out.text(" fcHandle="); out.decimal(handle);
     NF_STATUS st = trace::status_for(out, "nf_setUDPFlowCtl");
+    if (!ipc::report_udp_state(EXL_UDP_API_SET_FLOWCTL, id, (int)st, handle, 0, 0)) st = NF_STATUS_FAIL;
     trace::result(out, st); trace::finish(out);
-    ipc::report_udp_state(EXL_UDP_API_SET_FLOWCTL, id, (int)st, handle, 0, 0);
     return st;
 }
 
@@ -2213,34 +2381,34 @@ NFAPI_EXPORT NF_STATUS nf_init(const char *driver_name, NF_EventHandler *handler
         out.text(" handler="); out.text(handler ? "present" : "absent");
     }
     NF_STATUS st = trace::status_for(out, "nf_init");
+    if (st == NF_STATUS_SUCCESS && !runtime::start(handler)) st = NF_STATUS_FAIL;
     trace::result(out, st); trace::finish(out);
-    if (st == NF_STATUS_SUCCESS) { inject::g_handler = handler; inject::start(handler); ipc::start(); }
     return st;
 }
 
 NFAPI_EXPORT void nf_free()
 {
     trace::line out; trace::prefix(out, "nf_free"); trace::finish(out);
-    inject::stop();
-    ipc::stop();
+    runtime::stop();
 }
 
 static NF_STATUS log_udp_post(const char *name, unsigned int api, ENDPOINT_ID id, const unsigned char *remote,
                               const char *buffer, int length, NF_UDP_OPTIONS __unaligned *options)
 {
     trace::line out; trace::prefix(out, name); out.text(" id="); out.hex(id);
-    out.text(" remoteAddress="); out.pointer(remote); out.text(" remote="); trace::sockaddr_text(out, remote);
-    out.text(" remoteRaw="); out.byte_array(remote, remote ? 28 : 0);
-    out.text(" buffer="); out.pointer(buffer); out.text(" length="); out.signed_decimal(length);
-    if (buffer && length > 0) { out.text(" payloadHead:"); trace::safe_hex(out, buffer, length < 64 ? (unsigned)length : 64); }
-    out.text(" options="); out.pointer(options);
-    if (options) {
-        out.text(" optionFlags="); out.hex(options->flags); out.text(" optionsLength="); out.signed_decimal(options->optionsLength);
-        if (options->optionsLength > 0) { out.text(" optionsBytes:"); trace::safe_hex(out, options->options, options->optionsLength < 128 ? (unsigned)options->optionsLength : 128); }
+    unsigned char wire[28]; unsigned int options_length;
+    if (!ipc::current_udp_event(id) ||
+        !ipc::prepare_udp_post(remote, buffer, length, options, wire, options_length)) {
+        out.text(" reason=invalid-arguments-or-no-synchronous-event");
+        trace::result(out, NF_STATUS_FAIL); trace::finish(out); return NF_STATUS_FAIL;
     }
+    out.text(" remote="); trace::sockaddr_text(out, wire);
+    out.text(" length="); out.signed_decimal(length);
+    if (buffer && length > 0) { out.text(" payloadHead:"); trace::safe_hex(out, buffer, length < 64 ? (unsigned)length : 64); }
+    out.text(" optionsLength="); out.decimal(options_length);
     NF_STATUS st = trace::status_for(out, name);
+    if (!ipc::report_udp_post(api, id, (int)st, wire, buffer, length, options)) st = NF_STATUS_FAIL;
     trace::result(out, st); trace::finish(out);
-    ipc::report_udp_post(api, id, (int)st, remote, buffer, length, options);
     return st;
 }
 
@@ -2260,8 +2428,8 @@ NFAPI_EXPORT NF_STATUS nf_udpDisableFiltering(ENDPOINT_ID id)
 {
     trace::line out; trace::prefix(out, "nf_udpDisableFiltering"); out.text(" id="); out.hex(id);
     NF_STATUS st = trace::status_for(out, "nf_udpDisableFiltering");
+    if (!ipc::report_udp_state(EXL_UDP_API_DISABLE_FILTERING, id, (int)st, 0, 0, 0)) st = NF_STATUS_FAIL;
     trace::result(out, st); trace::finish(out);
-    ipc::report_udp_state(EXL_UDP_API_DISABLE_FILTERING, id, (int)st, 0, 0, 0);
     return st;
 }
 
@@ -2269,8 +2437,8 @@ NFAPI_EXPORT NF_STATUS nf_udpEnableFiltering(ENDPOINT_ID id)
 {
     trace::line out; trace::prefix(out, "nf_udpEnableFiltering"); out.text(" id="); out.hex(id);
     NF_STATUS st = trace::status_for(out, "nf_udpEnableFiltering");
+    if (!ipc::report_udp_state(EXL_UDP_API_ENABLE_FILTERING, id, (int)st, 0, 0, 0)) st = NF_STATUS_FAIL;
     trace::result(out, st); trace::finish(out);
-    ipc::report_udp_state(EXL_UDP_API_ENABLE_FILTERING, id, (int)st, 0, 0, 0);
     return st;
 }
 
@@ -2280,10 +2448,10 @@ NFAPI_EXPORT NF_STATUS nf_udpAddRemoteAddrRule(ENDPOINT_ID id, NF_UDP_REMOTE_ADD
     // ExitLag extension; layout not in the public SDK. Dump readable bytes only.
     out.text(" rule="); out.pointer(rule); out.text(" layout=opaque "); trace::safe_hex(out, rule, 128);
     NF_STATUS st = trace::status_for(out, "nf_udpAddRemoteAddrRule");
-    trace::result(out, st); trace::finish(out);
     unsigned int readable = rule ? (unsigned int)trace::readable_bytes(rule, 20) : 0;
     if (readable > 20) readable = 20;
-    ipc::report_udp_state(EXL_UDP_API_ADD_REMOTE_RULE, id, (int)st, 0, rule, readable);
+    if (!ipc::report_udp_state(EXL_UDP_API_ADD_REMOTE_RULE, id, (int)st, 0, rule, readable)) st = NF_STATUS_FAIL;
+    trace::result(out, st); trace::finish(out);
     return st;
 }
 

@@ -8,6 +8,7 @@ import struct
 import tempfile
 import threading
 import unittest
+from unittest import mock
 import bridge as b
 import test_bridge
 from test_bridge import Shim
@@ -106,6 +107,27 @@ class ConfigurationTests(unittest.TestCase):
             link = Path(folder) / "link"; link.symlink_to(path)
             with self.assertRaises(OSError):
                 WineSocketAdapter.load(link, os.getuid(), [])
+
+    def test_hardlinked_configuration_is_refused(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'config'
+            path.write_text('{}'); path.chmod(0o600)
+            os.link(path, Path(folder) / 'hardlink')
+            with self.assertRaisesRegex(ValueError, 'private and owned'):
+                WineSocketAdapter.load(path, os.getuid(), [])
+
+    def test_fifo_configuration_is_rejected_without_waiting_for_a_writer(self):
+        # Keep the guard meaningful without letting a regression hang this suite.
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'config'
+            os.mkfifo(path, 0o600)
+            original_open = os.open
+            def nonblocking_open(filename, flags, *args, **kwargs):
+                self.assertTrue(flags & os.O_NONBLOCK, 'A FIFO would block before validation')
+                return original_open(filename, flags, *args, **kwargs)
+            with mock.patch('wine_socket.os.open', side_effect=nonblocking_open):
+                with self.assertRaisesRegex(ValueError, 'private and owned'):
+                    WineSocketAdapter.load(path, os.getuid(), [])
 
 
 if __name__ == "__main__":

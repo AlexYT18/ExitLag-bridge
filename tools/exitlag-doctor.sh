@@ -239,8 +239,8 @@ section "Identity map"
 map="${EXITLAG_IDENTITY_MAP:-}"
 if [[ -z "$map" ]]; then
     printf '  %s--%s    EXITLAG_IDENTITY_MAP not set\n' "$c_warn" "$c_off"
-    printf '        only games inside ExitLag'"'"'s own Wine prefix will be routed.\n'
-    printf '        to route a native, Proton or other-prefix game, see backend/identity-map.example\n'
+    printf '        identity resolution reports only actual host executable paths.\n'
+    printf '        Wine/Proton translation requires a reviewed executable-bound map; see backend/identity-map.example\n'
 elif [[ ! -f "$map" ]]; then
     bad "identity map not found: $map" \
         "the helper refuses to start without it once it is configured" \
@@ -257,19 +257,41 @@ else
             map_bad=1; continue
         fi
         src="${line%%$'\t'*}"
+        rest="${line#*$'\t'}"
+        target="${rest%%$'\t'*}"
+        owner=""; has_owner=0
+        if [[ "$rest" == *$'\t'* ]]; then owner="${rest#*$'\t'}"; has_owner=1; fi
+        if [[ -z "$target" || ( "$has_owner" == 1 && ( -z "$owner" || "$owner" == *$'\t'* ) ) ]]; then
+            bad "identity map line $line_no: empty or excess fields" \
+                "native rows need two columns; prefix rows need three" \
+                "see docs/process-identity-translation.md"
+            map_bad=1; continue
+        fi
         case "$src" in
             wineprefix:*)
                 dir="${src#wineprefix:}"
-                [[ -d "$dir" ]] || { bad "identity map line $line_no: prefix does not exist: $dir" \
+                [[ "$dir" == /* && -d "$dir" ]] || { bad "identity map line $line_no: prefix does not exist or is not absolute: $dir" \
                     "a wineprefix: source must be an existing directory or the helper refuses to start" \
-                    "correct the path, or remove the line"; map_bad=1; } ;;
+                    "correct the path, or remove the line"; map_bad=1; }
+                if [[ "$has_owner" == 0 ]]; then
+                    bad "identity map line $line_no: prefix mapping requires OWNER_EXE third column" \
+                        "prefix environment alone is unsafe; old prefix-only rows are refused" \
+                        "append a literal tab and the exact verified runtime executable path"
+                    map_bad=1
+                elif [[ "$owner" != /* || ! -f "$owner" || ! -x "$owner" ]]; then
+                    bad "identity map line $line_no: invalid OWNER_EXE executable" \
+                        "the approved owner must be an absolute existing executable file" \
+                        "select the actual /proc/PID/exe socket owner"
+                    map_bad=1
+                fi ;;
             /*)
-                [[ -e "$src" ]] || { bad "identity map line $line_no: path does not exist: $src" \
+                [[ -f "$src" && -x "$src" ]] || { bad "identity map line $line_no: path does not exist or is not executable: $src" \
                     "an absolute source is matched against /proc/<pid>/exe and must resolve" \
-                    "correct the path, or remove the line"; map_bad=1; } ;;
-            *.exe|*.EXE) : ;;
+                    "correct the path, or remove the line"; map_bad=1; }
+                [[ "$has_owner" == 0 ]] || { bad "identity map line $line_no: native mapping requires two columns" \
+                    "OWNER_EXE belongs only to prefix mappings" "remove the third column"; map_bad=1; } ;;
             *) bad "identity map line $line_no: unrecognised source '$src'" \
-                   "sources must be an absolute path, an exact .exe argv token, or wineprefix:<dir>" \
+                   "sources must be absolute executable paths or executable-bound wineprefix:<dir> rows; argv is unsafe" \
                    "see backend/identity-map.example"; map_bad=1 ;;
         esac
     done < "$map"

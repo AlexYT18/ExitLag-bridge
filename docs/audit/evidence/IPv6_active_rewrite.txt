@@ -1,0 +1,21 @@
+=== IPv6 map installed? ===
+  PASS  tcp_redirect_v6 map exists
+  PASS  IPv6 dnat rule present
+
+=== real IPv6 connection through the production path ===
+  PASS  IPv6 connection was redirected to the local listener
+  PASS  listener accepted the redirected connection
+  PASS  client still observes the ORIGINAL remote endpoint (reverse translation)
+  PASS  helper armed the IPv6 DNAT
+
+=== invalid IPv6 targets are actually rejected (real connections) ===
+  PASS  rejected unspecified: callback returned invalid unicast target
+  PASS  rejected multicast: callback returned invalid unicast target
+  PASS  rejected zeroport: callback returned port zero
+  PASS  rejected nonloopback: callback returned a non
+
+=== teardown removes all IPv6 state ===
+  PASS  teardown removed the IPv6 map and all table state
+
+11 passed, 0 failed
+logs: /tmp/tmp.DbWEGND1rM (removed on exit)

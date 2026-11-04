@@ -1,0 +1,41 @@
+test_both_game_configurations_are_kept_separate (test_auto_launcher.Lifecycle.test_both_game_configurations_are_kept_separate) ... ok
+test_installation_user_is_derived_and_system_accounts_are_refused (test_auto_launcher.Lifecycle.test_installation_user_is_derived_and_system_accounts_are_refused) ... ok
+test_pf_changes_are_limited_to_the_fixed_anchor_and_scope (test_auto_launcher.Lifecycle.test_pf_changes_are_limited_to_the_fixed_anchor_and_scope) ... ok
+test_standard_game_paths_may_be_installed_after_the_bridge (test_auto_launcher.Lifecycle.test_standard_game_paths_may_be_installed_after_the_bridge) ... ok
+test_launcher_read_lock_does_not_stop_status_publication (test_auto_launcher.Records.test_launcher_read_lock_does_not_stop_status_publication) ... ok
+test_links_and_public_records_are_refused (test_auto_launcher.Records.test_links_and_public_records_are_refused) ... ok
+test_private_control_is_bounded_and_epoch_scoped (test_auto_launcher.Records.test_private_control_is_bounded_and_epoch_scoped) ... ok
+test_first_flow_can_wait_for_companion_startup (test_auto_launcher.ReloadingFlows.test_first_flow_can_wait_for_companion_startup) ... ok
+test_forever_uses_its_own_port_and_identity (test_auto_launcher.ReloadingFlows.test_forever_uses_its_own_port_and_identity) ... ok
+test_missing_companion_falls_back_to_the_original_destination (test_auto_launcher.ReloadingFlows.test_missing_companion_falls_back_to_the_original_destination) ... ok
+test_new_companion_is_loaded_after_game_restart (test_auto_launcher.ReloadingFlows.test_new_companion_is_loaded_after_game_restart) ... ok
+test_bad_token_rejected (test_bridge.BridgeTests.test_bad_token_rejected) ... ok
+test_malformed_response_uses_original (test_bridge.BridgeTests.test_malformed_response_uses_original) ... ok
+test_native_process_attribution (test_bridge.BridgeTests.test_native_process_attribution) ... skipped 'Requires macOS libproc'
+test_no_shim_uses_original (test_bridge.BridgeTests.test_no_shim_uses_original) ... ok
+test_non_loopback_redirect_rejected (test_bridge.BridgeTests.test_non_loopback_redirect_rejected) ... ok
+test_real_tcp_relay_and_nested_identity (test_bridge.BridgeTests.test_real_tcp_relay_and_nested_identity) ... ok
+test_relay_metrics_count_real_payload (test_bridge.BridgeTests.test_relay_metrics_count_real_payload) ... ok
+test_second_shim_cannot_replace_first (test_bridge.BridgeTests.test_second_shim_cannot_replace_first) ... ok
+test_slow_shim_falls_back_promptly (test_bridge.BridgeTests.test_slow_shim_falls_back_promptly) ... ok
+test_token_permissions_and_no_overwrite (test_bridge.BridgeTests.test_token_permissions_and_no_overwrite) ... ok
+test_unchanged_callback_uses_original (test_bridge.BridgeTests.test_unchanged_callback_uses_original) ... ok
+test_unmapped_process_never_asks_shim (test_bridge.BridgeTests.test_unmapped_process_never_asks_shim) ... ok
+test_wire_sizes_match_packed_c_protocol (test_bridge.BridgeTests.test_wire_sizes_match_packed_c_protocol) ... ok
+test_parser_accepts_generated_anchor_without_loading (test_pf_plan.PFPlanTests.test_parser_accepts_generated_anchor_without_loading) ... skipped 'Requires the macOS PF parser'
+test_rejects_broad_or_loopback_targets (test_pf_plan.PFPlanTests.test_rejects_broad_or_loopback_targets) ... ok
+test_requires_specific_user_and_destination (test_pf_plan.PFPlanTests.test_requires_specific_user_and_destination) ... ok
+test_only_the_session_owners_exact_anchor_is_accepted (test_recover.RecoveryTests.test_only_the_session_owners_exact_anchor_is_accepted) ... ok
+test_missing_wrong_owner_and_symlink_stop_the_session (test_session_control.SessionControlTests.test_missing_wrong_owner_and_symlink_stop_the_session) ... ok
+test_only_run_keeps_the_session_active (test_session_control.SessionControlTests.test_only_run_keeps_the_session_active) ... ok
+test_adapter_reserves_wine_tuple_and_carries_real_bytes (test_wine_socket.AdapterFlowTests.test_adapter_reserves_wine_tuple_and_carries_real_bytes) ... ok
+test_wrong_companion_pid_falls_back_without_sending_game_data (test_wine_socket.AdapterFlowTests.test_wrong_companion_pid_falls_back_without_sending_game_data) ... ok
+test_fifo_configuration_is_rejected_without_waiting_for_a_writer (test_wine_socket.ConfigurationTests.test_fifo_configuration_is_rejected_without_waiting_for_a_writer) ... ok
+test_hardlinked_configuration_is_refused (test_wine_socket.ConfigurationTests.test_hardlinked_configuration_is_refused) ... ok
+test_private_owned_configuration_loads_and_public_file_is_refused (test_wine_socket.ConfigurationTests.test_private_owned_configuration_loads_and_public_file_is_refused) ... ok
+test_symlink_configuration_is_refused (test_wine_socket.ConfigurationTests.test_symlink_configuration_is_refused) ... ok
+
+----------------------------------------------------------------------
+Ran 36 tests in 4.654s
+
+OK (skipped=2)

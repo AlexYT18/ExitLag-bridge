@@ -1,0 +1,21 @@
+test_authenticated_replacement_serves_new_session (__main__.BackendIPCTests.test_authenticated_replacement_serves_new_session) ... ok
+test_existing_log_is_private_before_any_diagnostics (__main__.BackendIPCTests.test_existing_log_is_private_before_any_diagnostics) ... ok
+test_header_dribble_has_total_handshake_deadline (__main__.BackendIPCTests.test_header_dribble_has_total_handshake_deadline) ... ok
+test_log_rejects_symlink_fifo_hardlink_and_symlink_parent (__main__.BackendIPCTests.test_log_rejects_symlink_fifo_hardlink_and_symlink_parent) ... ok
+test_log_rotation_keeps_private_regular_files (__main__.BackendIPCTests.test_log_rotation_keeps_private_regular_files) ... ok
+test_partial_frame_disconnect_and_recovery (__main__.BackendIPCTests.test_partial_frame_disconnect_and_recovery) ... ok
+test_rejected_candidates_do_not_evict_active_session (__main__.BackendIPCTests.test_rejected_candidates_do_not_evict_active_session) ... ok
+test_reserved_flags_and_oversized_frames_disconnect (__main__.BackendIPCTests.test_reserved_flags_and_oversized_frames_disconnect) ... ok
+test_resolve_request_requires_exact_size_and_zero_reserved (__main__.BackendIPCTests.test_resolve_request_requires_exact_size_and_zero_reserved) ... ok
+test_second_hello_disconnects_authenticated_session (__main__.BackendIPCTests.test_second_hello_disconnects_authenticated_session) ... ok
+test_synthetic_nested_replies_cannot_extend_rpc_deadline (__main__.BackendIPCTests.test_synthetic_nested_replies_cannot_extend_rpc_deadline) ... ok
+test_synthetic_stale_replies_cannot_extend_rpc_deadline (__main__.BackendIPCTests.test_synthetic_stale_replies_cannot_extend_rpc_deadline) ... ok
+test_synthetic_surplus_reply_is_not_accepted (__main__.BackendIPCTests.test_synthetic_surplus_reply_is_not_accepted) ... ok
+test_timeout_argument_is_strictly_positive_and_bounded (__main__.BackendIPCTests.test_timeout_argument_is_strictly_positive_and_bounded) ... ok
+test_udp_post_diagnostics_do_not_capture_payload (__main__.BackendIPCTests.test_udp_post_diagnostics_do_not_capture_payload) ... ok
+test_valid_session_and_secret_hygiene (__main__.BackendIPCTests.test_valid_session_and_secret_hygiene) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 3.122s
+
+OK

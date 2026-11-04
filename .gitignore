@@ -68,6 +68,9 @@ macos/app/dist/
 
 # Build locally; do not commit machine-specific compiled helpers.
 /backend/exitlag-netd
+/backend/ipc-transport-test
+/backend/tcp-attribution-test
+/backend/process-identity-test
 
 installers/**/__pycache__/
 installers/payloads/
@@ -77,4 +80,10 @@ installers/bridge_setup/__pycache__/
 
 # Python caches at any source depth are local build products.
 **/__pycache__/
+backend/nfq-verdict-test
+backend/udp-attribution-test
+backend/udp-packet-test
+backend/udp-peers-test
+backend/udp-lifecycle-test
+backend/udp-maintenance-test
 *.pyc

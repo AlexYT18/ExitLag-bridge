@@ -1,0 +1,14 @@
+make: Entering directory '/workspace/exitlag-bridge/backend'
+cc  -O1 -g -Wall -Wextra -fno-omit-frame-pointer -fsanitize=address,undefined -fsanitize=address,undefined -o udp-attribution-test ../tests/udp-attribution-test.c udp_attribution.c
+./udp-attribution-test
+PASS: UDP attribution fixtures/live sockets (73 cases), connected peers, wildcards, bounds and ambiguity
+cc  -O1 -g -Wall -Wextra -fno-omit-frame-pointer -fsanitize=address,undefined -fsanitize=address,undefined -o udp-packet-test ../tests/udp-packet-test.c udp_packet.c
+./udp-packet-test
+PASS: UDP packet codec (1418077 checks), IPv4/IPv6 bounds, wire endpoints and independent checksums
+cc  -O1 -g -Wall -Wextra -fno-omit-frame-pointer -fsanitize=address,undefined -fsanitize=address,undefined -o udp-peers-test ../tests/udp-peers-test.c udp_peers.c
+./udp-peers-test
+PASS: bounded UDP peer prepare/commit, independent endpoints and timeout boundaries
+cc  -O1 -g -Wall -Wextra -fno-omit-frame-pointer -fsanitize=address,undefined -fsanitize=address,undefined -o nfq-verdict-test ../tests/nfq-verdict-test.c nfq_verdict.c -lmnl
+./nfq-verdict-test
+PASS: NFQUEUE verdict wire encoding, packet replacement, bounds, priority and fwmark isolation
+make: Leaving directory '/workspace/exitlag-bridge/backend'

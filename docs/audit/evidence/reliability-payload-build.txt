@@ -1,0 +1,26 @@
+/workspace/exitlag-bridge/shim/nfapi/build/nfapi.dll
+ddae60edfa8c19dab83c7410fe7c4200911e947b4b534154b4a3989153c25804  /workspace/exitlag-bridge/shim/nfextlag/build/nfextlag.sys
+tools/winebuild/winebuild -w --implib -o dlls/gdi32/x86_64-windows/libgdi32.a \
+  --cc-cmd="/workspace/exitlag-bridge/build/installer/bin/x86_64-windows-clang" --without-dlltool -b \
+  x86_64-windows --export \
+  /workspace/exitlag-bridge/build/installer/wine-source/wine-wine-11.17/dlls/gdi32/gdi32.spec
+tools/winegcc/winegcc -o dlls/wbemprox/x86_64-windows/wbemprox.dll --wine-objdir . \
+  --cc-cmd="/workspace/exitlag-bridge/build/installer/bin/x86_64-windows-clang" -b x86_64-windows \
+  -Wl,--wine-builtin -shared \
+  /workspace/exitlag-bridge/build/installer/wine-source/wine-wine-11.17/dlls/wbemprox/wbemprox.spec \
+  dlls/wbemprox/x86_64-windows/builtin.o dlls/wbemprox/x86_64-windows/class.o \
+  dlls/wbemprox/x86_64-windows/main.o dlls/wbemprox/x86_64-windows/process.o \
+  dlls/wbemprox/x86_64-windows/qualifier.o dlls/wbemprox/x86_64-windows/query.o \
+  dlls/wbemprox/x86_64-windows/reg.o dlls/wbemprox/x86_64-windows/security.o \
+  dlls/wbemprox/x86_64-windows/service.o dlls/wbemprox/x86_64-windows/services.o \
+  dlls/wbemprox/x86_64-windows/sysrestore.o dlls/wbemprox/x86_64-windows/table.o \
+  dlls/wbemprox/x86_64-windows/wbemlocator.o dlls/wbemprox/x86_64-windows/wql.tab.o \
+  dlls/wbemprox/x86_64-windows/wbemprox_r.res dlls/winspool.drv/x86_64-windows/libwinspool.a \
+  dlls/version/x86_64-windows/libversion.a dlls/iphlpapi/x86_64-windows/libiphlpapi.a \
+  dlls/setupapi/x86_64-windows/libsetupapi.a dlls/oleaut32/x86_64-windows/liboleaut32.a \
+  dlls/ole32/x86_64-windows/libole32.a dlls/advapi32/x86_64-windows/libadvapi32.a \
+  dlls/user32/x86_64-windows/libuser32.a dlls/gdi32/x86_64-windows/libgdi32.a \
+  dlls/ws2_32/x86_64-windows/libws2_32.a libs/winecrt0/x86_64-windows/libwinecrt0.a \
+  libs/compiler-rt/x86_64-windows/libcompiler-rt.a dlls/ucrtbase/x86_64-windows/libucrtbase.a \
+  dlls/kernel32/x86_64-windows/libkernel32.a dlls/ntdll/x86_64-windows/libntdll.a -Wl,--build-id
+{"payloads_ready": true, "corresponding_wine_source": "/workspace/exitlag-bridge/build/installer/exitlag-bridge-wine-source.tar.gz"}

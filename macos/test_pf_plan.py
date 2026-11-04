@@ -1,10 +1,12 @@
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 import unittest
 from pf_plan import make_rules
 
 class PFPlanTests(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == 'darwin', 'Requires the macOS PF parser')
     def test_parser_accepts_generated_anchor_without_loading(self):
         with tempfile.TemporaryDirectory() as directory:
             path=Path(directory)/"anchor"

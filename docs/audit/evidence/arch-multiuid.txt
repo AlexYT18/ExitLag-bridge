@@ -1,0 +1,39 @@
+helper: 127.0.0.1:51908  owner uid 0
+
+=== authentication ===
+  PASS  wrong uid refused
+  PASS  correct uid, wrong token refused
+  PASS  correct uid, all-zero token refused
+  PASS  correct uid + correct token accepted
+  PASS  correct token, wrong protocol version refused
+
+=== token lifecycle ===
+  PASS  token file removed on helper exit
+  PASS  token rotated on restart
+  PASS  replayed token from the previous session refused
+  PASS  current token accepted after restart
+
+=== malformed authentication ===
+  PASS  survived: bad magic
+  PASS  survived: hello too short for token
+  PASS  survived: absurd declared length
+  PASS  survived: length beyond max payload
+  PASS  survived: truncated header
+  PASS  survived: header then no payload
+  PASS  survived: routing message before auth
+  PASS  survived: unknown message type
+  PASS  survived: immediate disconnect
+  PASS  survived: junk burst
+  PASS  token-bearing hello with surplus bytes refused
+
+=== malformed traffic AFTER a successful handshake ===
+  PASS  survived malformed traffic from an authenticated peer
+
+=== liveness ===
+  PASS  helper still serving valid clients after every hostile input
+
+=== secret hygiene ===
+  PASS  token never appears in the log
+
+23 passed, 0 failed
+log: /tmp/exitlag-source/runtime/logs/ipcsec-20261102T122127/helper.log

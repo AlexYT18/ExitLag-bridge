@@ -1,0 +1,12 @@
+test_combo_selection_wins_over_older_file_inspection (__main__.RealTkPicker.test_combo_selection_wins_over_older_file_inspection) ... ok
+test_native_game_requires_confirmed_identity (__main__.RealTkPicker.test_native_game_requires_confirmed_identity) ... ok
+test_saturated_checks_leave_refresh_available_for_retry (__main__.RealTkPicker.test_saturated_checks_leave_refresh_available_for_retry) ... ok
+test_select_game_and_save_private_valid_map (__main__.RealTkPicker.test_select_game_and_save_private_valid_map) ... ok
+test_slow_scan_keeps_tk_responsive_and_close_ignores_result (__main__.RealTkPicker.test_slow_scan_keeps_tk_responsive_and_close_ignores_result) ... ok
+test_stale_process_keeps_rule_list_unchanged (__main__.RealTkPicker.test_stale_process_keeps_rule_list_unchanged) ... ok
+test_two_images_require_explicit_selection (__main__.RealTkPicker.test_two_images_require_explicit_selection) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 1.355s
+
+OK

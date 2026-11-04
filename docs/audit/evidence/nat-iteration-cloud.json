@@ -1,0 +1,756 @@
+{
+  "schema_version": 1,
+  "validation_level": 1,
+  "environment": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "python": "3.12.14",
+    "uid": 1000
+  },
+  "results": [
+    {
+      "name": "Python syntax",
+      "status": "PASS",
+      "reason": "58 source files"
+    },
+    {
+      "name": "Shell syntax",
+      "status": "PASS",
+      "command": [
+        "bash",
+        "-c",
+        "for script in \"$@\"; do bash -n \"$script\" || exit; done",
+        "syntax",
+        "backend/nft-setup.sh",
+        "backend/nft-teardown.sh",
+        "backend/run-passive.sh",
+        "backend/run-tcp-redirect.sh",
+        "backend/run-udp-observe.sh",
+        "backend/run-udp-steer.sh",
+        "backend/runtime-guard.sh",
+        "installers/linux/install.sh",
+        "installers/linux/uninstall.sh",
+        "macos/app/build.sh",
+        "macos/build-companion.sh",
+        "macos/build-shim.sh",
+        "macos/client.sh",
+        "shim/llvm-toolchain.sh",
+        "shim/nfapi/build.sh",
+        "shim/nfextlag/build.sh",
+        "tests/build-nfapi-compat-smoketest.sh",
+        "tests/discovery-test.sh",
+        "tests/doctor-test.sh",
+        "tests/harden-runtime-test.sh",
+        "tests/identity-assistant-test.sh",
+        "tests/ipc-fuzz-test.sh",
+        "tests/ipc-security-test.sh",
+        "tests/ipv6-redirect-test.sh",
+        "tests/portable-arch-container.sh",
+        "tests/rpc-surface-test.sh",
+        "tests/run-all.sh",
+        "tests/run-cloud.sh",
+        "tests/run-isolated.sh",
+        "tests/setup-simulation-test.sh",
+        "tests/test-external-route.sh",
+        "tests/test-identity-map.sh",
+        "tests/test-shim-attribution.sh",
+        "tests/test-shim-pid-domain.sh",
+        "tests/test-shim-reconnect.sh",
+        "tests/test-shim-validation.sh",
+        "tests/validate-external-prefix.sh",
+        "tests/verify-nfapi-abi.sh",
+        "tools/check-exitlag-abi.sh",
+        "tools/check-exitlag-version.sh",
+        "tools/exitlag-doctor.sh",
+        "tools/exitlag-setup.sh",
+        "tools/install-nfextlag-stub.sh",
+        "tools/install-wbemprox-prefix-override.sh",
+        "tools/remove-nfextlag-stub.sh",
+        "tools/restore-wbemprox-prefix-override.sh",
+        "tools/run-exitlag-gameprefix.sh",
+        "tools/run-exitlag-production.sh",
+        "wine-wbemprox/build-local.sh"
+      ],
+      "exit_code": 0,
+      "seconds": 0.165,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/Shell_syntax.log"
+    },
+    {
+      "name": "ShellCheck source errors",
+      "status": "PASS",
+      "command": [
+        "shellcheck",
+        "-S",
+        "error",
+        "backend/nft-setup.sh",
+        "backend/nft-teardown.sh",
+        "backend/run-passive.sh",
+        "backend/run-tcp-redirect.sh",
+        "backend/run-udp-observe.sh",
+        "backend/run-udp-steer.sh",
+        "backend/runtime-guard.sh",
+        "installers/linux/install.sh",
+        "installers/linux/uninstall.sh",
+        "macos/app/build.sh",
+        "macos/build-companion.sh",
+        "macos/build-shim.sh",
+        "macos/client.sh",
+        "shim/llvm-toolchain.sh",
+        "shim/nfapi/build.sh",
+        "shim/nfextlag/build.sh",
+        "tests/build-nfapi-compat-smoketest.sh",
+        "tests/discovery-test.sh",
+        "tests/doctor-test.sh",
+        "tests/harden-runtime-test.sh",
+        "tests/identity-assistant-test.sh",
+        "tests/ipc-fuzz-test.sh",
+        "tests/ipc-security-test.sh",
+        "tests/ipv6-redirect-test.sh",
+        "tests/portable-arch-container.sh",
+        "tests/rpc-surface-test.sh",
+        "tests/run-all.sh",
+        "tests/run-cloud.sh",
+        "tests/run-isolated.sh",
+        "tests/setup-simulation-test.sh",
+        "tests/test-external-route.sh",
+        "tests/test-identity-map.sh",
+        "tests/test-shim-attribution.sh",
+        "tests/test-shim-pid-domain.sh",
+        "tests/test-shim-reconnect.sh",
+        "tests/test-shim-validation.sh",
+        "tests/validate-external-prefix.sh",
+        "tests/verify-nfapi-abi.sh",
+        "tools/check-exitlag-abi.sh",
+        "tools/check-exitlag-version.sh",
+        "tools/exitlag-doctor.sh",
+        "tools/exitlag-setup.sh",
+        "tools/install-nfextlag-stub.sh",
+        "tools/install-wbemprox-prefix-override.sh",
+        "tools/remove-nfextlag-stub.sh",
+        "tools/restore-wbemprox-prefix-override.sh",
+        "tools/run-exitlag-gameprefix.sh",
+        "tools/run-exitlag-production.sh",
+        "wine-wbemprox/build-local.sh"
+      ],
+      "exit_code": 0,
+      "seconds": 2.977,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/ShellCheck_source_errors.log"
+    },
+    {
+      "name": "test_discovery_filters.py",
+      "status": "PASS",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "tests/test_discovery_filters.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.165,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/test_discovery_filters_py.log",
+      "test_methods": 3
+    },
+    {
+      "name": "test_identity_tools.py",
+      "status": "PASS",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "tests/test_identity_tools.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.165,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/test_identity_tools_py.log",
+      "test_methods": 11
+    },
+    {
+      "name": "test_installer.py",
+      "status": "PASS",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "tests/test_installer.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.215,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/test_installer_py.log",
+      "test_methods": 13
+    },
+    {
+      "name": "test_linux_desktop.py",
+      "status": "PASS",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "tests/test_linux_desktop.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.167,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/test_linux_desktop_py.log",
+      "test_methods": 11
+    },
+    {
+      "name": "test_linux_launcher.py",
+      "status": "PASS",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "tests/test_linux_launcher.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.165,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/test_linux_launcher_py.log",
+      "test_methods": 5
+    },
+    {
+      "name": "test_mac_distribution.py",
+      "status": "PASS",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "tests/test_mac_distribution.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.114,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/test_mac_distribution_py.log",
+      "test_methods": 4
+    },
+    {
+      "name": "test_source_audit.py",
+      "status": "PASS",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "tests/test_source_audit.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.165,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/test_source_audit_py.log",
+      "test_methods": 4
+    },
+    {
+      "name": "test_runner.py",
+      "status": "PASS",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "tests/test_runner.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.265,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/test_runner_py.log",
+      "test_methods": 14
+    },
+    {
+      "name": "test-integration-support.py",
+      "status": "PASS",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "tests/test-integration-support.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.165,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/test_integration_support_py.log",
+      "test_methods": 9
+    },
+    {
+      "name": "test_benchmark_ipc.py",
+      "status": "PASS",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "tests/test_benchmark_ipc.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.114,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/test_benchmark_ipc_py.log",
+      "test_methods": 11
+    },
+    {
+      "name": "test_llvm_toolchain.py",
+      "status": "PASS",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "tests/test_llvm_toolchain.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.114,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/test_llvm_toolchain_py.log",
+      "test_methods": 3
+    },
+    {
+      "name": "macOS account-free units",
+      "status": "PASS",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "macos",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "seconds": 4.829,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/macOS_account_free_units.log",
+      "test_methods": 36,
+      "skipped_methods": 2
+    },
+    {
+      "name": "Native IPC transport",
+      "status": "PASS",
+      "command": [
+        "make",
+        "-B",
+        "-C",
+        "backend",
+        "check-ipc"
+      ],
+      "exit_code": 0,
+      "seconds": 0.47,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/Native_IPC_transport.log"
+    },
+    {
+      "name": "Native NFQUEUE verdict encoding",
+      "status": "PASS",
+      "command": [
+        "make",
+        "-B",
+        "-C",
+        "backend",
+        "check-nfq-verdict"
+      ],
+      "exit_code": 0,
+      "seconds": 0.167,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/Native_NFQUEUE_verdict_encoding.log"
+    },
+    {
+      "name": "Shim IPC validation",
+      "status": "PASS",
+      "command": [
+        "bash",
+        "tests/test-shim-validation.sh"
+      ],
+      "exit_code": 0,
+      "seconds": 0.42,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/Shim_IPC_validation.log"
+    },
+    {
+      "name": "Fresh backend build",
+      "status": "PASS",
+      "command": [
+        "make",
+        "-B",
+        "-C",
+        "backend"
+      ],
+      "exit_code": 0,
+      "seconds": 1.126,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/Fresh_backend_build.log"
+    },
+    {
+      "name": "Native TCP attribution",
+      "status": "PASS",
+      "command": [
+        "make",
+        "-B",
+        "-C",
+        "backend",
+        "check-tcp-attribution"
+      ],
+      "exit_code": 0,
+      "seconds": 0.32,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/Native_TCP_attribution.log"
+    },
+    {
+      "name": "Native process identity",
+      "status": "PASS",
+      "command": [
+        "make",
+        "-B",
+        "-C",
+        "backend",
+        "check-process-identity"
+      ],
+      "exit_code": 0,
+      "seconds": 0.266,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/Native_process_identity.log"
+    },
+    {
+      "name": "Shim socket attribution",
+      "status": "PASS",
+      "command": [
+        "bash",
+        "tests/test-shim-attribution.sh"
+      ],
+      "exit_code": 0,
+      "seconds": 1.019,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/Shim_socket_attribution.log"
+    },
+    {
+      "name": "Shim PID domains",
+      "status": "PASS",
+      "command": [
+        "bash",
+        "tests/test-shim-pid-domain.sh"
+      ],
+      "exit_code": 0,
+      "seconds": 0.67,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/Shim_PID_domains.log"
+    },
+    {
+      "name": "Authenticated backend IPC",
+      "status": "PASS",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "tests/test_backend_ipc.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "seconds": 3.075,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/Authenticated_backend_IPC.log",
+      "test_methods": 16
+    },
+    {
+      "name": "test-identity-map.sh",
+      "status": "PASS",
+      "command": [
+        "bash",
+        "tests/test-identity-map.sh"
+      ],
+      "exit_code": 0,
+      "seconds": 0.165,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/test_identity_map_sh.log"
+    },
+    {
+      "name": "rpc-surface-test.sh",
+      "status": "PASS",
+      "command": [
+        "bash",
+        "tests/rpc-surface-test.sh"
+      ],
+      "exit_code": 0,
+      "seconds": 0.616,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/rpc_surface_test_sh.log"
+    },
+    {
+      "name": "identity-assistant-test.sh",
+      "status": "PASS",
+      "command": [
+        "bash",
+        "tests/identity-assistant-test.sh"
+      ],
+      "exit_code": 0,
+      "seconds": 1.923,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/identity_assistant_test_sh.log"
+    },
+    {
+      "name": "Process discovery",
+      "status": "PASS",
+      "command": [
+        "bash",
+        "tests/discovery-test.sh"
+      ],
+      "exit_code": 0,
+      "seconds": 3.482,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/Process_discovery.log",
+      "test_methods": 3
+    },
+    {
+      "name": "Doctor diagnoses",
+      "status": "PASS",
+      "command": [
+        "bash",
+        "tests/doctor-test.sh"
+      ],
+      "exit_code": 0,
+      "seconds": 0.416,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/Doctor_diagnoses.log"
+    },
+    {
+      "name": "Windows shim build",
+      "status": "PASS",
+      "command": [
+        "bash",
+        "shim/nfapi/build.sh"
+      ],
+      "exit_code": 0,
+      "seconds": 2.678,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/Windows_shim_build.log"
+    },
+    {
+      "name": "Windows driver presence image build",
+      "status": "PASS",
+      "command": [
+        "bash",
+        "shim/nfextlag/build.sh"
+      ],
+      "exit_code": 0,
+      "seconds": 0.114,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/Windows_driver_presence_image_build.log"
+    },
+    {
+      "name": "Crash guard executable build only",
+      "status": "PASS",
+      "command": [
+        "bash",
+        "tests/build-nfapi-compat-smoketest.sh"
+      ],
+      "exit_code": 0,
+      "seconds": 2.679,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/Crash_guard_executable_build_only.log"
+    },
+    {
+      "name": "ShellCheck runner scripts",
+      "status": "PASS",
+      "command": [
+        "shellcheck",
+        "tests/run-cloud.sh",
+        "tests/run-all.sh",
+        "tests/run-isolated.sh"
+      ],
+      "exit_code": 0,
+      "seconds": 0.214,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/ShellCheck_runner_scripts.log"
+    },
+    {
+      "name": "Cppcheck native backend",
+      "status": "PASS",
+      "command": [
+        "cppcheck",
+        "--check-level=exhaustive",
+        "--enable=warning,performance,portability",
+        "--error-exitcode=1",
+        "--std=c11",
+        "--suppress=missingIncludeSystem",
+        "backend/exitlag-netd.c",
+        "backend/ipc_transport.c",
+        "backend/tcp_attribution.c",
+        "backend/process_identity.c",
+        "backend/nfq_verdict.c"
+      ],
+      "exit_code": 0,
+      "seconds": 23.838,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/Cppcheck_native_backend.log"
+    },
+    {
+      "name": "GCC static analyzer IPC",
+      "status": "PASS",
+      "command": [
+        "cc",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fanalyzer",
+        "-c",
+        "backend/ipc_transport.c",
+        "-o",
+        "/workspace/exitlag-validation/nat-iteration-final-cloud/ipc-analyzer.o"
+      ],
+      "exit_code": 0,
+      "seconds": 0.114,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/GCC_static_analyzer_IPC.log"
+    },
+    {
+      "name": "GCC static analyzer tcp_attribution",
+      "status": "PASS",
+      "command": [
+        "cc",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fanalyzer",
+        "-c",
+        "backend/tcp_attribution.c",
+        "-o",
+        "/workspace/exitlag-validation/nat-iteration-final-cloud/tcp_attribution-analyzer.o"
+      ],
+      "exit_code": 0,
+      "seconds": 0.616,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/GCC_static_analyzer_tcp_attribution.log"
+    },
+    {
+      "name": "GCC static analyzer process_identity",
+      "status": "PASS",
+      "command": [
+        "cc",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fanalyzer",
+        "-c",
+        "backend/process_identity.c",
+        "-o",
+        "/workspace/exitlag-validation/nat-iteration-final-cloud/process_identity-analyzer.o"
+      ],
+      "exit_code": 0,
+      "seconds": 0.566,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/GCC_static_analyzer_process_identity.log"
+    },
+    {
+      "name": "GCC static analyzer nfq_verdict",
+      "status": "PASS",
+      "command": [
+        "cc",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fanalyzer",
+        "-c",
+        "backend/nfq_verdict.c",
+        "-o",
+        "/workspace/exitlag-validation/nat-iteration-final-cloud/nfq_verdict-analyzer.o"
+      ],
+      "exit_code": 0,
+      "seconds": 0.032,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/GCC_static_analyzer_nfq_verdict.log"
+    },
+    {
+      "name": "ASan UBSan native IPC transport",
+      "status": "PASS",
+      "command": [
+        "make",
+        "-B",
+        "-C",
+        "backend",
+        "check-ipc",
+        "CFLAGS=-O1 -g -Wall -Wextra -fno-omit-frame-pointer -fsanitize=address,undefined",
+        "LDFLAGS=-fsanitize=address,undefined"
+      ],
+      "exit_code": 0,
+      "seconds": 0.516,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/ASan_UBSan_native_IPC_transport.log"
+    },
+    {
+      "name": "ASan UBSan NFQUEUE verdict encoding",
+      "status": "PASS",
+      "command": [
+        "make",
+        "-B",
+        "-C",
+        "backend",
+        "check-nfq-verdict",
+        "CFLAGS=-O1 -g -Wall -Wextra -fno-omit-frame-pointer -fsanitize=address,undefined",
+        "LDFLAGS=-fsanitize=address,undefined"
+      ],
+      "exit_code": 0,
+      "seconds": 0.221,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/ASan_UBSan_NFQUEUE_verdict_encoding.log"
+    },
+    {
+      "name": "ASan UBSan shim IPC validation",
+      "status": "PASS",
+      "command": [
+        "bash",
+        "tests/test-shim-validation.sh",
+        "--sanitize"
+      ],
+      "exit_code": 0,
+      "seconds": 0.62,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/ASan_UBSan_shim_IPC_validation.log"
+    },
+    {
+      "name": "ASan UBSan native TCP attribution",
+      "status": "PASS",
+      "command": [
+        "make",
+        "-B",
+        "-C",
+        "backend",
+        "check-tcp-attribution",
+        "CFLAGS=-O1 -g -Wall -Wextra -fno-omit-frame-pointer -fsanitize=address,undefined",
+        "LDFLAGS=-fsanitize=address,undefined"
+      ],
+      "exit_code": 0,
+      "seconds": 0.418,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/ASan_UBSan_native_TCP_attribution.log"
+    },
+    {
+      "name": "ASan UBSan native process identity",
+      "status": "PASS",
+      "command": [
+        "make",
+        "-B",
+        "-C",
+        "backend",
+        "check-process-identity",
+        "CFLAGS=-O1 -g -Wall -Wextra -fno-omit-frame-pointer -fsanitize=address,undefined",
+        "LDFLAGS=-fsanitize=address,undefined"
+      ],
+      "exit_code": 0,
+      "seconds": 0.365,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/ASan_UBSan_native_process_identity.log"
+    },
+    {
+      "name": "ASan UBSan shim socket attribution",
+      "status": "PASS",
+      "command": [
+        "bash",
+        "tests/test-shim-attribution.sh",
+        "--sanitize"
+      ],
+      "exit_code": 0,
+      "seconds": 2.074,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/ASan_UBSan_shim_socket_attribution.log"
+    },
+    {
+      "name": "ASan UBSan shim PID domains",
+      "status": "PASS",
+      "command": [
+        "bash",
+        "tests/test-shim-pid-domain.sh",
+        "--sanitize"
+      ],
+      "exit_code": 0,
+      "seconds": 1.318,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/ASan_UBSan_shim_PID_domains.log"
+    },
+    {
+      "name": "ASan UBSan fresh backend",
+      "status": "PASS",
+      "command": [
+        "make",
+        "-B",
+        "-C",
+        "backend",
+        "CFLAGS=-O1 -g -Wall -Wextra -fno-omit-frame-pointer -fsanitize=address,undefined",
+        "LDFLAGS=-fsanitize=address,undefined"
+      ],
+      "exit_code": 0,
+      "seconds": 1.574,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/ASan_UBSan_fresh_backend.log"
+    },
+    {
+      "name": "ASan UBSan authenticated backend IPC",
+      "status": "PASS",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "tests/test_backend_ipc.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "seconds": 3.173,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/ASan_UBSan_authenticated_backend_IPC.log",
+      "test_methods": 16
+    },
+    {
+      "name": "Restore release backend build",
+      "status": "PASS",
+      "command": [
+        "make",
+        "-B",
+        "-C",
+        "backend"
+      ],
+      "exit_code": 0,
+      "seconds": 0.918,
+      "log": "/workspace/exitlag-validation/nat-iteration-final-cloud/Restore_release_backend_build.log"
+    },
+    {
+      "name": "Level 2 kernel routing",
+      "status": "SKIP",
+      "reason": "separate disposable namespace test: tests/run-isolated.sh"
+    },
+    {
+      "name": "Level 3 live ExitLag and games",
+      "status": "SKIP",
+      "reason": "requires legitimate client/subscription and a suitable game host"
+    }
+  ],
+  "summary": {
+    "PASS": 48,
+    "FAIL": 0,
+    "SKIP": 2
+  }
+}

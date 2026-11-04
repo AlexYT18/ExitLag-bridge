@@ -1,0 +1,16 @@
+test_missing_arguments_are_rejected (__main__.CommandLine.test_missing_arguments_are_rejected) ... ok
+test_nonpositive_counts_fail_before_starting_helper (__main__.CommandLine.test_nonpositive_counts_fail_before_starting_helper) ... ok
+test_synthetic_runs_produce_correct_percentiles_and_honest_scope (__main__.CommandLine.test_synthetic_runs_produce_correct_percentiles_and_honest_scope) ... ok
+test_eof_mid_header_or_body_is_error (__main__.Framing.test_eof_mid_header_or_body_is_error) ... ok
+test_exact_accumulates_fragmented_bytes (__main__.Framing.test_exact_accumulates_fragmented_bytes) ... ok
+test_expected_body_and_heartbeat_reply (__main__.Framing.test_expected_body_and_heartbeat_reply) ... ok
+test_invalid_magic_flags_or_oversized_length_are_rejected (__main__.Framing.test_invalid_magic_flags_or_oversized_length_are_rejected) ... ok
+test_send_encodes_length_and_zero_flags (__main__.Framing.test_send_encodes_length_and_zero_flags) ... ok
+test_unexpected_type_is_error (__main__.Framing.test_unexpected_type_is_error) ... ok
+test_missing_or_malformed_proc_metrics_are_not_invented (__main__.ResourceParsing.test_missing_or_malformed_proc_metrics_are_not_invented) ... ok
+test_proc_stat_handles_spaces_and_parentheses_in_comm (__main__.ResourceParsing.test_proc_stat_handles_spaces_and_parentheses_in_comm) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.008s
+
+OK

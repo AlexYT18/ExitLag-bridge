@@ -1,0 +1,1 @@
+/tmp/exitlag-source/tests/nfapi-compat-smoketest.exe

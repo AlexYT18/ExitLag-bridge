@@ -1,0 +1,3 @@
+callback sequence: udpCreated -> udpConnectRequest -> udpSend -> udpReceive -> udpClosed
+heartbeat, bidirectional payload, nested post/rule and endpoint close: PASS
+synthetic single-endpoint UDP steering: PASS; owned resources cleaned up

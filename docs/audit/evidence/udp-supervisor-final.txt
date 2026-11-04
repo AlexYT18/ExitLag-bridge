@@ -1,0 +1,21 @@
+test_duplicate_canonical_mapping_is_rejected_but_distinct_loaders_work (__main__.Supervisor.test_duplicate_canonical_mapping_is_rejected_but_distinct_loaders_work) ... ok
+test_expired_or_removed_lease_stops_routing (__main__.Supervisor.test_expired_or_removed_lease_stops_routing) ... ok
+test_fixed_installed_command_preserves_tcp_default_and_selects_udp_runner (__main__.Supervisor.test_fixed_installed_command_preserves_tcp_default_and_selects_udp_runner) ... ok
+test_invalid_authorization_metadata_is_rejected_before_spawning (__main__.Supervisor.test_invalid_authorization_metadata_is_rejected_before_spawning) ... ok
+test_lease_requires_private_regular_single_link_file (__main__.Supervisor.test_lease_requires_private_regular_single_link_file) ... ok
+test_lease_timestamp_boundaries_reject_future_and_expired_records (__main__.Supervisor.test_lease_timestamp_boundaries_reject_future_and_expired_records) ... ok
+test_map_is_data_not_a_root_command (__main__.Supervisor.test_map_is_data_not_a_root_command) ... ok
+test_map_links_public_files_and_other_owners_are_refused (__main__.Supervisor.test_map_links_public_files_and_other_owners_are_refused) ... ok
+test_native_mapping_does_not_accept_extra_owner_column (__main__.Supervisor.test_native_mapping_does_not_accept_extra_owner_column) ... ok
+test_parent_identity_includes_owner_and_start_time (__main__.Supervisor.test_parent_identity_includes_owner_and_start_time) ... ok
+test_prefix_mapping_requires_actual_loader_third_column (__main__.Supervisor.test_prefix_mapping_requires_actual_loader_third_column) ... ok
+test_prefix_owner_and_native_source_must_be_regular_executables (__main__.Supervisor.test_prefix_owner_and_native_source_must_be_regular_executables) ... ok
+test_supervisor_environment_is_scoped_and_does_not_inherit_routing_overrides (__main__.Supervisor.test_supervisor_environment_is_scoped_and_does_not_inherit_routing_overrides) ... ok
+test_udp_is_explicit_boolean_cli_mode_and_defaults_to_tcp (__main__.Supervisor.test_udp_is_explicit_boolean_cli_mode_and_defaults_to_tcp) ... ok
+test_udp_runner_refuses_unprivileged_start_before_firewall_commands (__main__.Supervisor.test_udp_runner_refuses_unprivileged_start_before_firewall_commands) ... ok
+test_uninstalled_privileged_entry_refuses_to_run (__main__.Supervisor.test_uninstalled_privileged_entry_refuses_to_run) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.015s
+
+OK

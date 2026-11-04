@@ -14,6 +14,8 @@
 set -uo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/run-all.sh"
+have_isolation || { echo 'SKIP: use tests/run-isolated.sh (network and PID isolation required)' >&2; exit 77; }
 port="${EXL_TEST_PORT:-51920}"
 listen_port="${EXL_V6_LISTEN:-39999}"
 # A real, routable external IPv6 so the kernel actually emits a SYN to queue.
@@ -36,8 +38,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-ip -6 addr show dev lo 2>/dev/null | grep -q '::1' || { echo "no IPv6 loopback; skipping" >&2; exit 0; }
-ip -6 route get "$dest" >/dev/null 2>&1 || { echo "no IPv6 route to $dest; skipping (needs IPv6 connectivity)" >&2; exit 0; }
+ip -6 addr show dev lo 2>/dev/null | grep -q '::1' || { echo "no IPv6 loopback; SKIP: IPv6 loopback unavailable" >&2; exit 77; }
+ip -6 route get "$dest" >/dev/null 2>&1 || { echo "no IPv6 route to $dest; SKIP: needs IPv6 connectivity" >&2; exit 77; }
 
 # ---- local IPv6 listener standing in for ExitLag's proxy -------------------
 python3 - "$listen_port" "$work/listener.log" <<'PY' &
@@ -102,7 +104,7 @@ while True:
     ip_family = struct.unpack("<H", body[28:30])[0]
     remote = bytearray(body[58:86])                    # remote_address[28]
     fam = struct.unpack("<H", bytes(remote[0:2]))[0]   # sockaddr family, little-endian
-    log.write("req tag=%d ip_family=%d sockaddr_family=%d\n" % (tag, ip_family, fam))
+    log.write("req tag=%d ip_family=%d sockaddr_family=%d pid=%d\n" % (tag, ip_family, fam, pid))
     if fam == 23:                                      # Windows AF_INET6
         remote[2:4]  = struct.pack(">H", lport)
         if mode == "valid":         remote[8:24] = b"\x00"*15 + b"\x01"        # ::1
@@ -134,14 +136,17 @@ QUEUE_NUM=0 TEST_DEST="$dest" "$repo_root/backend/nft-setup.sh" >/dev/null 2>&1 
 echo "=== IPv6 map installed? ==="
 nft list map inet exitlag tcp_redirect_v6 >/dev/null 2>&1 \
     && ok "tcp_redirect_v6 map exists" || bad "tcp_redirect_v6 map exists" "missing"
-nft list chain inet exitlag output_nat 2>/dev/null | grep -q 'tcp_redirect_v6' \
+nft list chain inet exitlag output_nat 2>/dev/null | grep -q 'jump tcp_authorized_nat' \
+    && ok "NAT dispatch enters the authorized chain" || bad "authorized NAT dispatch" "missing"
+nft list chain inet exitlag tcp_authorized_nat 2>/dev/null | grep -q 'tcp_redirect_v6' \
     && ok "IPv6 dnat rule present" || bad "IPv6 dnat rule present" "missing"
 
 echo; echo "=== real IPv6 connection through the production path ==="
 python3 - "$dest" "$dest_port" "$work/client.log" <<'PY'
-import socket, sys
+import os, socket, sys
 s=socket.socket(socket.AF_INET6, socket.SOCK_STREAM); s.settimeout(8)
 log=open(sys.argv[3],"w",buffering=1)
+log.write("pid=%d\n" % os.getpid())
 try:
     s.connect((sys.argv[1], int(sys.argv[2])))
     log.write("peer=%s\n" % (s.getpeername(),))
@@ -163,6 +168,12 @@ grep -q "$dest" "$work/client.log" 2>/dev/null \
     || bad "reverse translation" "getpeername did not report $dest: $(tr '\n' ' ' < "$work/client.log")"
 grep -q 'DNAT armed' "$work/helper.log" 2>/dev/null \
     && ok "helper armed the IPv6 DNAT" || bad "helper armed DNAT" "not logged"
+client_pid="$(sed -n 's/^pid=\([0-9][0-9]*\)$/\1/p' "$work/client.log")"
+if [[ "$client_pid" =~ ^[1-9][0-9]*$ ]] && grep -q " pid=$client_pid$" "$work/harness.log"; then
+    ok "IPv6 callback identifies the actual client process"
+else
+    bad "IPv6 process attribution" "callback PID did not match client PID ${client_pid:-missing}"
+fi
 
 echo; echo "=== invalid IPv6 targets are actually rejected (real connections) ==="
 # Each mode makes the harness return a deliberately illegal target. The helper

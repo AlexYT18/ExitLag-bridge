@@ -85,10 +85,10 @@ struct exl_hello {
     unsigned int       shim_process_id;   /* ExitLag's Windows PID */
     unsigned long long capabilities;      /* reserved */
     /*
-     * Proof that the sender can read the per-session token file, which only the
-     * owning user can. The uid check alone cannot distinguish the real shim from
-     * any other process of the same user; this can. Compared in constant time
-     * and never logged.
+     * Proof that the sender can read the owning account's per-session token.
+     * This prevents cross-account access and stale replay, not impersonation
+     * by another process of that same UID. Compared in constant time; never
+     * logged. Trust the owning desktop account as a whole.
      */
     unsigned char      token[EXL_TOKEN_BYTES];
 };

@@ -1,0 +1,143 @@
+IPv4 identity pid=21: PASS; bidirectional bytes/source and replacement count
+IPv4 identity pid=21: PASS; bidirectional bytes/source and replacement count
+IPv4 identity pid=21: PASS; bidirectional bytes/source and replacement count
+IPv4 simultaneous distinct process/socket attribution: PASS
+IPv4 identity pid=30: PASS; bidirectional bytes/source and replacement count
+IPv4 rewrite pid=30: PASS; bidirectional bytes/source and replacement count
+IPv4 rewrite pid=31: PASS; bidirectional bytes/source and replacement count
+IPv4 one unconnected socket with two in-flight relay remotes: PASS
+IPv4 identity pid=30: PASS; bidirectional bytes/source and replacement count
+IPv4 receive-empty pid=30: PASS; bidirectional bytes/source and replacement count
+IPv4 wrong-tag pid=30: PASS; bidirectional bytes/source and replacement count
+IPv4 wrong-endpoint pid=30: PASS; bidirectional bytes/source and replacement count
+IPv4 duplicate pid=30: PASS; bidirectional bytes/source and replacement count
+IPv4 options pid=30: PASS; bidirectional bytes/source and replacement count
+IPv4 status pid=30: PASS; bidirectional bytes/source and replacement count
+IPv4 direction pid=30: PASS; bidirectional bytes/source and replacement count
+IPv4 zero-port pid=30: PASS; bidirectional bytes/source and replacement count
+IPv4 wrong-family pid=30: PASS; bidirectional bytes/source and replacement count
+IPv4 bad-receive pid=30: PASS; bidirectional bytes/source and replacement count
+IPv4 rewrite pid=64: PASS; bidirectional bytes/source and replacement count
+IPv4 collision pid=67: PASS; bidirectional bytes/source and replacement count
+IPv4 rewrite pid=64: PASS; bidirectional bytes/source and replacement count
+IPv4 shared-local cross-process relay collision fails open: PASS
+IPv4 identity pid=73: PASS; bidirectional bytes/source and replacement count
+IPv4 identity pid=76: PASS; bidirectional bytes/source and replacement count
+IPv4 immediate local-port reuse has fresh PID and endpoint: PASS
+IPv4 persistent-control pid=79: PASS; bidirectional bytes/source and replacement count
+IPv4 persistent-control pid=79: PASS; bidirectional bytes/source and replacement count
+IPv4 lifecycle control remains fail-open across datagrams: PASS
+IPv6 simultaneous distinct process/socket attribution: PASS
+IPv6 identity pid=84: PASS; bidirectional bytes/source and replacement count
+IPv6 rewrite pid=84: PASS; bidirectional bytes/source and replacement count
+IPv6 rewrite pid=85: PASS; bidirectional bytes/source and replacement count
+IPv6 one unconnected socket with two in-flight relay remotes: PASS
+IPv6 identity pid=84: PASS; bidirectional bytes/source and replacement count
+IPv6 receive-empty pid=84: PASS; bidirectional bytes/source and replacement count
+IPv6 wrong-tag pid=84: PASS; bidirectional bytes/source and replacement count
+IPv6 wrong-endpoint pid=84: PASS; bidirectional bytes/source and replacement count
+IPv6 duplicate pid=84: PASS; bidirectional bytes/source and replacement count
+IPv6 options pid=84: PASS; bidirectional bytes/source and replacement count
+IPv6 status pid=84: PASS; bidirectional bytes/source and replacement count
+IPv6 direction pid=84: PASS; bidirectional bytes/source and replacement count
+IPv6 zero-port pid=84: PASS; bidirectional bytes/source and replacement count
+IPv6 wrong-family pid=84: PASS; bidirectional bytes/source and replacement count
+IPv6 bad-receive pid=84: PASS; bidirectional bytes/source and replacement count
+IPv6 rewrite pid=118: PASS; bidirectional bytes/source and replacement count
+IPv6 collision pid=121: PASS; bidirectional bytes/source and replacement count
+IPv6 rewrite pid=118: PASS; bidirectional bytes/source and replacement count
+IPv6 shared-local cross-process relay collision fails open: PASS
+IPv6 identity pid=127: PASS; bidirectional bytes/source and replacement count
+IPv6 identity pid=130: PASS; bidirectional bytes/source and replacement count
+IPv6 immediate local-port reuse has fresh PID and endpoint: PASS
+IPv6 persistent-control pid=133: PASS; bidirectional bytes/source and replacement count
+IPv6 persistent-control pid=133: PASS; bidirectional bytes/source and replacement count
+IPv6 lifecycle control remains fail-open across datagrams: PASS
+IPv4 identity pid=30: PASS; bidirectional bytes/source and replacement count
+IPv6 identity pid=84: PASS; bidirectional bytes/source and replacement count
+IPv4 identity pid=79: PASS; bidirectional bytes/source and replacement count
+IPv6 identity pid=133: PASS; bidirectional bytes/source and replacement count
+IPv4 timeout pid=30: PASS; bidirectional bytes/source and replacement count
+IPv4 identity pid=30: PASS; bidirectional bytes/source and replacement count
+Synthetic UDP helper diagnostics (last metadata lines):
+nt_tag=112 id=0xb6bd7f23e1f0a1f2 status=0 remote=[2001:db8:80::2]:34269 len=23 metadata-only
+2026-11-04T17:07:09.731Z udp udpSend tag=112 id=0xb6bd7f23e1f0a1f2 linux=[2001:db8:80::1]:51888 -> [2001:db8:80::2]:54764 linux_pid=121 len=18 metadata-only | ACCEPT unchanged (UDP target, reverse binding or raw send unavailable)
+2026-11-04T17:07:09.732Z nf_udpPostReceive event_tag=113 id=0xb6bd7f23e1f0a1f2 status=0 remote=[2001:db8:80::2]:54764 len=27 metadata-only
+2026-11-04T17:07:09.775Z udp udpReceive tag=113 id=0xb6bd7f23e1f0a1f2 linux=[2001:db8:80::1]:51888 -> [2001:db8:80::2]:54764 linux_pid=121 len=27 metadata-only | POST_RECEIVE applied (UDP multi)
+2026-11-04T17:07:09.780Z nf_udpPostSend event_tag=114 id=0xb6bd7f23e1f0a1f1 status=0 remote=[2001:db8:80::2]:34269 len=26 metadata-only
+2026-11-04T17:07:09.823Z udp udpSend tag=114 id=0xb6bd7f23e1f0a1f1 linux=[2001:db8:80::1]:51888 -> [2001:db8:80::2]:43768 linux_pid=118 len=21 metadata-only | DROP original; POST_SEND applied (UDP multi)
+2026-11-04T17:07:09.824Z nf_udpPostReceive event_tag=115 id=0xb6bd7f23e1f0a1f1 status=0 remote=[2001:db8:80::2]:43768 len=29 metadata-only
+2026-11-04T17:07:09.867Z udp udpReceive tag=115 id=0xb6bd7f23e1f0a1f1 linux=[2001:db8:80::1]:51888 -> [2001:db8:80::2]:34269 linux_pid=118 len=32 metadata-only | POST_RECEIVE applied (UDP multi)
+2026-11-04T17:07:09.933Z udp udpClosed tag=116 id=0xb6bd7f23e1f0a1f0 local=[2001:db8:80::1]:46973 linux_pid=85 exe=/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 effective_pid=85 verdict=0 mutated_info=0 remote_rules=0 flowctl=0
+2026-11-04T17:07:09.933Z udp endpoint release id=0xb6bd7f23e1f0a1f0 reason=socket-or-process-replaced
+2026-11-04T17:07:09.933Z udp udpCreated tag=117 id=0xb6bd7f23e1f0a1f3 local=[2001:db8:80::1]:46973 linux_pid=130 exe=/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 effective_pid=130 verdict=0 mutated_info=0 remote_rules=0 flowctl=0
+2026-11-04T17:07:09.934Z udp udpConnectRequest tag=118 id=0xb6bd7f23e1f0a1f3 linux=[2001:db8:80::1]:46973 -> [2001:db8:80::2]:43768 linux_pid=130 exe=/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 effective_pid=130 flag=0x12->0x12 remote_after=[2001:db8:80::2]:43768 verdict=0 mutated={flag=0,remote=0} | OBSERVE unchanged
+2026-11-04T17:07:09.934Z nf_udpPostSend event_tag=119 id=0xb6bd7f23e1f0a1f3 status=0 remote=[2001:db8:80::2]:43768 len=9 metadata-only
+2026-11-04T17:07:09.975Z udp udpSend tag=119 id=0xb6bd7f23e1f0a1f3 linux=[2001:db8:80::1]:46973 -> [2001:db8:80::2]:43768 linux_pid=130 len=9 metadata-only | DROP original; POST_SEND applied (UDP multi)
+2026-11-04T17:07:09.976Z nf_udpPostReceive event_tag=120 id=0xb6bd7f23e1f0a1f3 status=0 remote=[2001:db8:80::2]:43768 len=18 metadata-only
+2026-11-04T17:07:10.020Z udp udpReceive tag=120 id=0xb6bd7f23e1f0a1f3 linux=[2001:db8:80::1]:46973 -> [2001:db8:80::2]:43768 linux_pid=130 len=18 metadata-only | POST_RECEIVE applied (UDP multi)
+2026-11-04T17:07:10.056Z udp state control event_tag=121 id=0xb6bd7f23e1f0a1f4 api=6 status=0 metadata-only
+2026-11-04T17:07:10.099Z udp udpCreated tag=121 id=0xb6bd7f23e1f0a1f4 local=[2001:db8:80::1]:35542 linux_pid=133 exe=/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 effective_pid=133 verdict=0 mutated_info=0 remote_rules=0 flowctl=1
+2026-11-04T17:07:10.099Z udp udpConnectRequest tag=122 id=0xb6bd7f23e1f0a1f4 linux=[2001:db8:80::1]:35542 -> [2001:db8:80::2]:43768 linux_pid=133 exe=/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 effective_pid=133 flag=0x12->0x12 remote_after=[2001:db8:80::2]:43768 verdict=0 mutated={flag=0,remote=0} | OBSERVE unchanged
+2026-11-04T17:07:10.099Z nf_udpPostSend event_tag=123 id=0xb6bd7f23e1f0a1f4 status=0 remote=[2001:db8:80::2]:43768 len=17 metadata-only
+2026-11-04T17:07:10.143Z udp udpSend tag=123 id=0xb6bd7f23e1f0a1f4 linux=[2001:db8:80::1]:35542 -> [2001:db8:80::2]:43768 linux_pid=133 len=17 metadata-only | ACCEPT unchanged (UDP observe/fail-open)
+2026-11-04T17:07:10.144Z nf_udpPostReceive event_tag=124 id=0xb6bd7f23e1f0a1f4 status=0 remote=[2001:db8:80::2]:43768 len=26 metadata-only
+2026-11-04T17:07:10.187Z udp udpReceive tag=124 id=0xb6bd7f23e1f0a1f4 linux=[2001:db8:80::1]:35542 -> [2001:db8:80::2]:43768 linux_pid=133 len=26 metadata-only | ACCEPT unchanged (UDP observe/fail-open)
+2026-11-04T17:07:10.192Z nf_udpPostSend event_tag=125 id=0xb6bd7f23e1f0a1f4 status=0 remote=[2001:db8:80::2]:54764 len=26 metadata-only
+2026-11-04T17:07:10.235Z udp udpSend tag=125 id=0xb6bd7f23e1f0a1f4 linux=[2001:db8:80::1]:35542 -> [2001:db8:80::2]:54764 linux_pid=133 len=26 metadata-only | ACCEPT unchanged (UDP observe/fail-open)
+2026-11-04T17:07:10.236Z nf_udpPostReceive event_tag=126 id=0xb6bd7f23e1f0a1f4 status=0 remote=[2001:db8:80::2]:54764 len=35 metadata-only
+2026-11-04T17:07:10.279Z udp udpReceive tag=126 id=0xb6bd7f23e1f0a1f4 linux=[2001:db8:80::1]:35542 -> [2001:db8:80::2]:54764 linux_pid=133 len=35 metadata-only | ACCEPT unchanged (UDP observe/fail-open)
+2026-11-04T17:07:10.283Z shim disconnected (unsolicited frame timeout, framing error or eof); failing open
+2026-11-04T17:07:10.283Z hello: shim protocol=3 exitlag_windows_pid=4242 (token accepted)
+2026-11-04T17:07:10.286Z udp udpCreated tag=127 id=0xb6bd7f23e1f0a1f5 local=198.18.80.1:53741 linux_pid=30 exe=/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 effective_pid=30 verdict=0 mutated_info=0 remote_rules=0 flowctl=0
+2026-11-04T17:07:10.287Z udp udpConnectRequest tag=128 id=0xb6bd7f23e1f0a1f5 linux=198.18.80.1:53741 -> 198.18.80.2:55006 linux_pid=30 exe=/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 effective_pid=30 flag=0x12->0x12 remote_after=198.18.80.2:55006 verdict=0 mutated={flag=0,remote=0} | OBSERVE unchanged
+2026-11-04T17:07:10.287Z nf_udpPostSend event_tag=129 id=0xb6bd7f23e1f0a1f5 status=0 remote=198.18.80.2:55006 len=13 metadata-only
+2026-11-04T17:07:10.331Z udp udpSend tag=129 id=0xb6bd7f23e1f0a1f5 linux=198.18.80.1:53741 -> 198.18.80.2:55006 linux_pid=30 len=13 metadata-only | DROP original; POST_SEND applied (UDP multi)
+2026-11-04T17:07:10.332Z nf_udpPostReceive event_tag=130 id=0xb6bd7f23e1f0a1f5 status=0 remote=198.18.80.2:55006 len=22 metadata-only
+2026-11-04T17:07:10.375Z udp udpReceive tag=130 id=0xb6bd7f23e1f0a1f5 linux=198.18.80.1:53741 -> 198.18.80.2:55006 linux_pid=30 len=22 metadata-only | POST_RECEIVE applied (UDP multi)
+2026-11-04T17:07:10.382Z udp udpCreated tag=131 id=0xb6bd7f23e1f0a1f6 local=[2001:db8:80::1]:38765 linux_pid=84 exe=/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 effective_pid=84 verdict=0 mutated_info=0 remote_rules=0 flowctl=0
+2026-11-04T17:07:10.382Z udp udpConnectRequest tag=132 id=0xb6bd7f23e1f0a1f6 linux=[2001:db8:80::1]:38765 -> [2001:db8:80::2]:43768 linux_pid=84 exe=/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 effective_pid=84 flag=0x12->0x12 remote_after=[2001:db8:80::2]:43768 verdict=0 mutated={flag=0,remote=0} | OBSERVE unchanged
+2026-11-04T17:07:10.382Z nf_udpPostSend event_tag=133 id=0xb6bd7f23e1f0a1f6 status=0 remote=[2001:db8:80::2]:43768 len=13 metadata-only
+2026-11-04T17:07:10.423Z udp udpSend tag=133 id=0xb6bd7f23e1f0a1f6 linux=[2001:db8:80::1]:38765 -> [2001:db8:80::2]:43768 linux_pid=84 len=13 metadata-only | DROP original; POST_SEND applied (UDP multi)
+2026-11-04T17:07:10.424Z nf_udpPostReceive event_tag=134 id=0xb6bd7f23e1f0a1f6 status=0 remote=[2001:db8:80::2]:43768 len=22 metadata-only
+2026-11-04T17:07:10.467Z udp udpReceive tag=134 id=0xb6bd7f23e1f0a1f6 linux=[2001:db8:80::1]:38765 -> [2001:db8:80::2]:43768 linux_pid=84 len=22 metadata-only | POST_RECEIVE applied (UDP multi)
+2026-11-04T17:07:10.472Z udp udpCreated tag=135 id=0xb6bd7f23e1f0a1f7 local=198.18.80.1:44339 linux_pid=79 exe=/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 effective_pid=79 verdict=0 mutated_info=0 remote_rules=0 flowctl=0
+2026-11-04T17:07:10.473Z udp udpConnectRequest tag=136 id=0xb6bd7f23e1f0a1f7 linux=198.18.80.1:44339 -> 198.18.80.2:55006 linux_pid=79 exe=/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 effective_pid=79 flag=0x12->0x12 remote_after=198.18.80.2:55006 verdict=0 mutated={flag=0,remote=0} | OBSERVE unchanged
+2026-11-04T17:07:10.473Z nf_udpPostSend event_tag=137 id=0xb6bd7f23e1f0a1f7 status=0 remote=198.18.80.2:55006 len=13 metadata-only
+2026-11-04T17:07:10.515Z udp udpSend tag=137 id=0xb6bd7f23e1f0a1f7 linux=198.18.80.1:44339 -> 198.18.80.2:55006 linux_pid=79 len=13 metadata-only | DROP original; POST_SEND applied (UDP multi)
+2026-11-04T17:07:10.516Z nf_udpPostReceive event_tag=138 id=0xb6bd7f23e1f0a1f7 status=0 remote=198.18.80.2:55006 len=22 metadata-only
+2026-11-04T17:07:10.559Z udp udpReceive tag=138 id=0xb6bd7f23e1f0a1f7 linux=198.18.80.1:44339 -> 198.18.80.2:55006 linux_pid=79 len=22 metadata-only | POST_RECEIVE applied (UDP multi)
+2026-11-04T17:07:10.565Z udp udpCreated tag=139 id=0xb6bd7f23e1f0a1f8 local=[2001:db8:80::1]:35542 linux_pid=133 exe=/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 effective_pid=133 verdict=0 mutated_info=0 remote_rules=0 flowctl=0
+2026-11-04T17:07:10.565Z udp udpConnectRequest tag=140 id=0xb6bd7f23e1f0a1f8 linux=[2001:db8:80::1]:35542 -> [2001:db8:80::2]:43768 linux_pid=133 exe=/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 effective_pid=133 flag=0x12->0x12 remote_after=[2001:db8:80::2]:43768 verdict=0 mutated={flag=0,remote=0} | OBSERVE unchanged
+2026-11-04T17:07:10.565Z nf_udpPostSend event_tag=141 id=0xb6bd7f23e1f0a1f8 status=0 remote=[2001:db8:80::2]:43768 len=13 metadata-only
+2026-11-04T17:07:10.607Z udp udpSend tag=141 id=0xb6bd7f23e1f0a1f8 linux=[2001:db8:80::1]:35542 -> [2001:db8:80::2]:43768 linux_pid=133 len=13 metadata-only | DROP original; POST_SEND applied (UDP multi)
+2026-11-04T17:07:10.608Z nf_udpPostReceive event_tag=142 id=0xb6bd7f23e1f0a1f8 status=0 remote=[2001:db8:80::2]:43768 len=22 metadata-only
+2026-11-04T17:07:10.651Z udp udpReceive tag=142 id=0xb6bd7f23e1f0a1f8 linux=[2001:db8:80::1]:35542 -> [2001:db8:80::2]:43768 linux_pid=133 len=22 metadata-only | POST_RECEIVE applied (UDP multi)
+2026-11-04T17:07:10.957Z shim reply failed or exceeded the 300 ms RPC deadline; failing open
+2026-11-04T17:07:10.958Z shim disconnected (reply timeout, framing error or disconnect); failing open
+2026-11-04T17:07:10.958Z udp udpSend tag=143 id=0xb6bd7f23e1f0a1f5 linux=198.18.80.1:53741 -> 198.18.80.2:55006 linux_pid=30 len=16 metadata-only | ACCEPT unchanged (UDP observe/fail-open)
+2026-11-04T17:07:10.962Z hello: shim protocol=3 exitlag_windows_pid=4242 (token accepted)
+2026-11-04T17:07:10.966Z udp udpCreated tag=144 id=0xb6bd7f23e1f0a1f9 local=198.18.80.1:53741 linux_pid=30 exe=/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 effective_pid=30 verdict=0 mutated_info=0 remote_rules=0 flowctl=0
+2026-11-04T17:07:10.966Z udp udpConnectRequest tag=145 id=0xb6bd7f23e1f0a1f9 linux=198.18.80.1:53741 -> 198.18.80.2:55006 linux_pid=30 exe=/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 effective_pid=30 flag=0x12->0x12 remote_after=198.18.80.2:55006 verdict=0 mutated={flag=0,remote=0} | OBSERVE unchanged
+2026-11-04T17:07:10.966Z nf_udpPostSend event_tag=146 id=0xb6bd7f23e1f0a1f9 status=0 remote=198.18.80.2:55006 len=24 metadata-only
+2026-11-04T17:07:11.007Z udp udpSend tag=146 id=0xb6bd7f23e1f0a1f9 linux=198.18.80.1:53741 -> 198.18.80.2:55006 linux_pid=30 len=24 metadata-only | DROP original; POST_SEND applied (UDP multi)
+2026-11-04T17:07:11.008Z nf_udpPostReceive event_tag=147 id=0xb6bd7f23e1f0a1f9 status=0 remote=198.18.80.2:55006 len=33 metadata-only
+2026-11-04T17:07:11.051Z udp udpReceive tag=147 id=0xb6bd7f23e1f0a1f9 linux=198.18.80.1:53741 -> 198.18.80.2:55006 linux_pid=30 len=33 metadata-only | POST_RECEIVE applied (UDP multi)
+
+Traceback (most recent call last):
+  File "/workspace/exitlag-bridge/tests/test-udp-multi.py", line 613, in <module>
+    raise SystemExit(run_main(main))
+                     ^^^^^^^^^^^^^^
+  File "/workspace/exitlag-bridge/tests/integration_support.py", line 156, in run_main
+    return function()
+           ^^^^^^^^^^
+  File "/workspace/exitlag-bridge/tests/test-udp-multi.py", line 555, in main
+    lines = Path('/proc/net/netfilter/nfnetlink_queue').read_text().splitlines()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1027, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/proc/net/netfilter/nfnetlink_queue'

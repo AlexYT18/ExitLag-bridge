@@ -1,0 +1,6 @@
+{
+  "status": "PASS",
+  "scope": "Pre-publication working-tree content inspection, including source/docs and synthetic evidence; subsequent publication commits were authorized separately",
+  "files_checked": 273,
+  "findings": []
+}

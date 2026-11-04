@@ -1,0 +1,77 @@
+PASS Python syntax: 66 source files
+PASS Shell syntax
+PASS ShellCheck source errors
+PASS test_discovery_filters.py
+PASS test_identity_tools.py
+PASS test_installer.py
+PASS test_linux_desktop.py
+PASS test_linux_launcher.py
+PASS test_mac_distribution.py
+PASS test_process_picker.py
+PASS test_game_picker.py
+PASS test_linux_packaging.py
+PASS test_source_audit.py
+PASS test_runner.py
+PASS test-integration-support.py
+PASS test_benchmark_ipc.py
+PASS test_llvm_toolchain.py
+PASS Tk process picker integration
+PASS macOS account-free units
+PASS Native IPC transport
+PASS Native NFQUEUE verdict encoding
+PASS Shim IPC validation
+PASS Fresh backend build
+PASS Native TCP attribution
+PASS Native process identity
+PASS Native UDP attribution
+PASS Native UDP packet codec
+PASS Native UDP peer lifecycle
+PASS Shim socket attribution
+PASS Shim PID domains
+FAIL Authenticated backend IPC: FAILED (failures=1)
+======================================================================
+FAIL: test_udp_post_diagnostics_do_not_capture_payload (__main__.BackendIPCTests.test_udp_post_diagnostics_do_not_capture_payload)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/exitlag-bridge/tests/test_backend_ipc.py", line 146, in test_udp_post_diagnostics_do_not_capture_payload
+    self.assertIn("nf_udpPostSend", log)
+AssertionError: 'nf_udpPostSend' not found in '2026-11-04T17:16:51.719Z IPC peer policy: uid 0 and uid 1000 may connect\n2026-11-04T17:16:51.719Z IPC session token published at /tmp/exl-ipc-test-wtjghyh8/token (owner uid 1000, mode 0600)\n2026-11-04T17:16:51.719Z endpoint id base = 0x5a392671fb112e06\n2026-11-04T17:16:51.719Z listening for shim on 127.0.0.1:60279\n2026-11-04T17:16:51.719Z IPC-only mode: netfilter is untouched, no packets are observed\n2026-11-04T17:16:51.730Z hello: shim protocol=3 exitlag_windows_pid=4242 (token accepted)\n2026-11-04T17:16:51.730Z udp post ignored: stale or uncorrelated event\n2026-11-04T17:16:51.730Z resolve pid=0 identity=unresolved -> (unresolved)\n'
+
+----------------------------------------------------------------------
+Ran 16 tests in 3.330s
+
+FAILED (failures=1)
+PASS test-identity-map.sh
+PASS rpc-surface-test.sh
+PASS identity-assistant-test.sh
+PASS Process discovery
+PASS Doctor diagnoses
+PASS Windows shim build
+PASS Windows driver presence image build
+PASS Crash guard executable build only
+PASS ShellCheck runner scripts
+PASS Cppcheck native backend
+PASS GCC static analyzer IPC
+PASS GCC static analyzer tcp_attribution
+PASS GCC static analyzer process_identity
+PASS GCC static analyzer nfq_verdict
+PASS GCC static analyzer udp_attribution
+PASS GCC static analyzer udp_packet
+PASS GCC static analyzer udp_peers
+PASS ASan UBSan native IPC transport
+PASS ASan UBSan NFQUEUE verdict encoding
+PASS ASan UBSan shim IPC validation
+PASS ASan UBSan native TCP attribution
+PASS ASan UBSan native process identity
+PASS ASan UBSan native UDP attribution
+PASS ASan UBSan native UDP packet codec
+PASS ASan UBSan native UDP peer lifecycle
+PASS ASan UBSan shim socket attribution
+PASS ASan UBSan shim PID domains
+PASS ASan UBSan fresh backend
+PASS ASan UBSan authenticated backend IPC
+PASS Restore release backend build
+SKIP Level 2 kernel routing: separate disposable namespace test: tests/run-isolated.sh
+SKIP Level 3 live ExitLag and games: requires legitimate client/subscription and a suitable game host
+
+60 PASS, 1 FAIL, 2 SKIP; /workspace/exitlag-validation/udp-integration-cloud/results.json

@@ -31,15 +31,36 @@ def read_map(path, uid):
     finally:
         os.close(fd)
     count = 0
+    identities = set()
     for line in data.splitlines():
         if not line.strip() or line.lstrip().startswith('#'):
             continue
         parts = line.split('\t')
-        if len(parts) != 2 or not parts[1].lower().endswith('.exe') or any(c in line for c in '\0\r'):
+        prefix = parts[0].startswith('wineprefix:')
+        if prefix and len(parts) == 2:
+            raise ValueError('Wine-prefix mappings require an OWNER_EXE third column; configure the actual Wine/Proton loader')
+        if (len(parts) != (3 if prefix else 2) or not parts[1].lower().endswith('.exe')
+                or any(c in line for c in '\0\r') or len(line) > 4096):
             raise ValueError('Invalid game mapping')
         source = parts[0].removeprefix('wineprefix:')
-        if not source.startswith('/') or len(line) > 4096:
+        if not source.startswith('/'):
             raise ValueError('Mappings require absolute game paths')
+        source_path = Path(source).resolve(strict=True)
+        if prefix:
+            if not source_path.is_dir() or not parts[2].startswith('/'):
+                raise ValueError('A Wine-prefix mapping requires a prefix directory and an absolute loader executable')
+            owner = Path(parts[2]).resolve(strict=True)
+            executable = owner
+        else:
+            owner = None
+            executable = source_path
+        info = executable.stat()
+        if not stat.S_ISREG(info.st_mode) or not info.st_mode & 0o111:
+            raise ValueError('Map the actual regular executable that owns the game connection')
+        key = (source_path, owner)
+        if key in identities:
+            raise ValueError('Duplicate game mapping')
+        identities.add(key)
         count += 1
     if not count or count > 128:
         raise ValueError('Configure between 1 and 128 games before enabling routing')
@@ -51,22 +72,54 @@ def lease_alive(path, uid):
         fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
         try:
             info = os.fstat(fd)
+            # Future timestamps (including a backwards wall-clock jump) must
+            # not extend an unresponsive launcher's authorization lease.
+            age = time.time() - info.st_mtime
             return (stat.S_ISREG(info.st_mode) and info.st_uid == uid and info.st_nlink == 1
                     and not info.st_mode & 0o077 and info.st_size < 64
-                    and time.time() - info.st_mtime < 6 and os.read(fd, 64) == b'run\n')
+                    and 0 <= age < 6 and os.read(fd, 64) == b'run\n')
         finally:
             os.close(fd)
     except OSError:
         return False
 
 
-def main():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--uid', type=int, required=True)
     parser.add_argument('--parent', type=int, required=True)
     parser.add_argument('--map', type=Path, required=True)
     parser.add_argument('--lease', type=Path, required=True)
-    args = parser.parse_args()
+    parser.add_argument('--udp', action='store_true',
+                        help='enable experimental synchronous UDP posts alongside TCP')
+    return parser.parse_args(argv)
+
+
+def runner_command(root, udp=False):
+    """Only the fixed runner in the already verified installation is executable."""
+    root = Path(root)
+    if root not in ROOTS or not isinstance(udp, bool):
+        raise ValueError('Use a fixed installed routing mode')
+    runner = 'run-udp-multi.sh' if udp else 'run-tcp-redirect.sh'
+    return ['/bin/bash', str(root / 'backend' / runner)]
+
+
+def runner_environment(uid, gid, mapping, log, udp=False):
+    """Construct from verified session data, never inherit routing overrides."""
+    if not isinstance(udp, bool) or not isinstance(uid, int) or uid < 1000 or not isinstance(gid, int) or gid < 0:
+        raise ValueError('Invalid authorized routing user or mode')
+    env = dict(PATH='/usr/sbin:/usr/bin:/sbin:/bin', LANG='C.UTF-8', HOME='/root',
+               SUDO_UID=str(uid), SUDO_GID=str(gid), EXL_USER_UID=str(uid),
+               TEST_DEST='any', ENABLE_REDIRECT='1', EXITLAG_IDENTITY_MAP=str(mapping),
+               NETD_LOG=str(log))
+    if udp:
+        env.update(UDP_TEST_DEST='any', ENABLE_UDP_OBSERVE='1',
+                   ENABLE_UDP_STEER='1', ENABLE_UDP_MULTI='1')
+    return env
+
+
+def main():
+    args = parse_args()
     root = Path(__file__).resolve().parents[2]
     if os.geteuid() != 0 or root not in ROOTS:
         raise SystemExit('Use the installed ExitLag Bridge launcher')
@@ -95,17 +148,14 @@ def main():
     fd = os.open(mapping, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, 'w') as output:
         output.write(data)
-    env = dict(PATH='/usr/sbin:/usr/bin:/sbin:/bin', LANG='C.UTF-8', HOME='/root',
-               SUDO_UID=str(args.uid), SUDO_GID=str(user.pw_gid), EXL_USER_UID=str(args.uid),
-               TEST_DEST='any', ENABLE_REDIRECT='1', EXITLAG_IDENTITY_MAP=str(mapping),
-               NETD_LOG=str(directory / 'backend.log'))
+    env = runner_environment(args.uid, user.pw_gid, mapping, directory / 'backend.log', args.udp)
     stop = False
     def stopping(*_):
         nonlocal stop
         stop = True
     for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, stopping)
-    child = subprocess.Popen(['/bin/bash', str(root / 'backend/run-tcp-redirect.sh')], env=env, cwd='/', start_new_session=True)
+    child = subprocess.Popen(runner_command(root, args.udp), env=env, cwd='/', start_new_session=True)
     try:
         while not stop and child.poll() is None and lease_alive(args.lease, args.uid):
             try:

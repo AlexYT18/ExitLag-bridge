@@ -1,0 +1,63 @@
+regression suite: tier=unit
+logs: /workspace/exitlag-bridge/runtime/logs/suite-20261102T074624-14205
+  root: no (system/live tiers will skip)
+  ExitLag: not running (live tier will skip)
+
+===== unit =====
+
+--- shim builds
+    PASS
+
+--- helper builds
+    PASS
+
+--- identity map pos/neg
+    PASS
+
+--- crash-guard build only
+    PASS
+
+--- doctor diagnoses
+    PASS
+
+--- RPC surface scope
+    PASS
+
+--- process discovery
+    PASS
+
+--- identity-map assistant
+    PASS
+
+--- setup simulation
+    PASS
+
+--- integration peer units
+    PASS
+
+===== summary =====
+PASS  shim builds
+PASS  helper builds
+SKIP  nfapi ABI matches ExitLag (the official ExitLag client is not installed)
+PASS  identity map pos/neg
+PASS  crash-guard build only
+SKIP  doctor self-check (the official ExitLag client is not installed)
+PASS  doctor diagnoses
+PASS  RPC surface scope
+PASS  process discovery
+PASS  identity-map assistant
+PASS  setup simulation
+PASS  integration peer units
+
+10 passed, 0 failed, 2 skipped
+
+Skipped tests are not passes. To run them:
+  - re-run with sudo for the system tier
+  - install the official ExitLag client (see README.md); it is not redistributable, so a fresh checkout will not have it
+  - start ExitLag (tools/run-exitlag-production.sh) for the live tier
+
+Not automated (need a real game and a human):
+  - TCP steering with live WoW world traffic
+  - UDP take-and-reinject against a real game's datagrams
+  - Proton routing with a real title
+  See docs/architecture.md for what each of those proved.

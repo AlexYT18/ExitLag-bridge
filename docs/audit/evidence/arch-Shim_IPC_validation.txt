@@ -1,0 +1,1 @@
+PASS: 5505 shim IPC validation checks (synthetic; no Wine or ExitLag)

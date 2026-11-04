@@ -5,6 +5,12 @@ EXPORTS
     FlushFileBuffers
     GetCurrentProcessId
     GetCurrentThreadId
+    TlsAlloc
+    TlsGetValue
+    TlsSetValue
+    GetProcessHeap
+    HeapAlloc
+    HeapFree
     GetEnvironmentVariableW
     GetModuleHandleW
     GetSystemTimeAsFileTime
@@ -21,3 +27,4 @@ EXPORTS
     CreateThread
     MoveFileExW
     GetFileSizeEx
+    WaitForSingleObject

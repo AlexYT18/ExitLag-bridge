@@ -1,0 +1,9 @@
+Development host: Linux-6.18.57-x86_64-with-glibc2.41 uid= 1000
+Target: Arch Linux x86_64; no real ExitLag/Wine/game session executed
+cat /etc/os-release: PRETTY_NAME="Debian GNU/Linux 13 (trixie)" exit 0
+cc --version: cc (Debian 14.2.0-19) 14.2.0 exit 0
+clang --version: Debian clang version 19.1.7 (3+b1) exit 0
+nft --version: nftables v1.1.3 (Commodore Bullmoose #4) exit 0
+ip -V: ip utility, iproute2-6.15.0, libbpf 1.5.0 exit 0
+python3 --version: Python 3.12.14 exit 0
+No host CAP_NET_ADMIN; user/network/PID/mount namespace isolation demonstrated by L2 wrapper.

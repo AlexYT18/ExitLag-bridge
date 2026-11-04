@@ -1,0 +1,12 @@
+=== PID resolution scope ===
+  PASS  an unreported PID is refused, not resolved
+
+=== redirect target scope ===
+  (checked statically: the helper refuses non-loopback DNAT targets)
+  PASS  non-loopback redirect targets are refused by policy
+  PASS  the policy has an explicit, documented override
+
+=== oversized and malformed payloads from an authenticated peer ===
+  PASS  helper survived malformed privileged requests
+
+4 passed, 0 failed

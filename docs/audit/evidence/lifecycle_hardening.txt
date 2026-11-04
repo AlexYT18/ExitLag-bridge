@@ -1,0 +1,47 @@
+hardening run -> /workspace/exitlag-bridge/runtime/logs/harden-20261102T121727
+probe target: 192.0.2.2:3724
+
+=== repeated start/stop cycles (5x) ===
+  PASS  repeated start/stop cycles (5x, table clean each time)
+
+=== stale nftables detection ===
+  PASS  stale table refused by pre-flight (exit 3)
+
+=== owned runner SIGKILL recovery ===
+  PASS  owned orphan helper and nftables table recovered after runner SIGKILL
+
+=== runner terminated with SIGTERM and SIGINT ===
+  PASS  SIGTERM left no table and no helper
+  PASS  SIGINT left no table and no helper
+
+=== fail-open with rules installed and no helper ===
+  PASS  traffic flows with rules installed and helper dead (queue bypass)
+
+=== helper crash (SIGKILL) mid-run ===
+/workspace/exitlag-bridge/tests/harden-runtime-test.sh: line 161:   363 Killed                  "$repo_root/backend/exitlag-netd" --queue "$queue" --port "$port" --apply-tcp --log "$log" "$@"
+  PASS  traffic survives SIGKILL of the helper
+
+=== shim reconnect after connected-but-silent helper ===
+  SKIP  shim reconnect -- requires prepared project Wine runtime and prefix
+
+=== protocol version mismatch detection ===
+  PASS  helper rejected a wrong protocol version
+
+=== unreachable destination (simulated network failure) ===
+  PASS  helper survives an unreachable destination and still routes afterwards
+
+=== summary ===
+PASS  repeated start/stop cycles (5x, table clean each time)
+PASS  stale table refused by pre-flight (exit 3)
+PASS  owned orphan helper and nftables table recovered after runner SIGKILL
+PASS  SIGTERM left no table and no helper
+PASS  SIGINT left no table and no helper
+PASS  traffic flows with rules installed and helper dead (queue bypass)
+PASS  traffic survives SIGKILL of the helper
+SKIP  shim reconnect -- requires prepared project Wine runtime and prefix
+PASS  helper rejected a wrong protocol version
+PASS  helper survives an unreachable destination and still routes afterwards
+
+9 passed, 0 failed, 1 skipped
+logs: /workspace/exitlag-bridge/runtime/logs/harden-20261102T121727
+final state clean: no exitlag table, no helper

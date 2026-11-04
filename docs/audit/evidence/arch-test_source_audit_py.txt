@@ -1,0 +1,9 @@
+test_committed_snapshot_and_metadata_are_scanned (__main__.SourceAudit.test_committed_snapshot_and_metadata_are_scanned) ... ok
+test_generated_binaries_and_runtime_files_are_flagged (__main__.SourceAudit.test_generated_binaries_and_runtime_files_are_flagged) ... ok
+test_personal_paths_and_lan_addresses_are_flagged (__main__.SourceAudit.test_personal_paths_and_lan_addresses_are_flagged) ... ok
+test_secret_values_are_not_echoed_in_findings (__main__.SourceAudit.test_secret_values_are_not_echoed_in_findings) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.146s
+
+OK
