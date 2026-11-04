@@ -133,7 +133,7 @@ class BackendIPCTests(unittest.TestCase):
         self.assertNotIn(self.token.hex(), self.log_path.read_text())
         self.assertEqual(self.token_path.stat().st_mode & 0o777, 0o600)
 
-    def test_udp_post_diagnostics_do_not_capture_payload(self):
+    def test_uncorrelated_udp_post_is_ignored_without_capturing_payload(self):
         self.start()
         sock = self.authenticate()
         canary = b"PRIVATE_DATAGRAM_CANARY_12345678"
@@ -143,8 +143,8 @@ class BackendIPCTests(unittest.TestCase):
         sock.sendall(frame(0x46, post))
         self.resolve_probe(sock)
         log = self.log_path.read_text()
-        self.assertIn("nf_udpPostSend", log)
-        self.assertIn("metadata-only", log)
+        self.assertIn("udp post ignored: stale or uncorrelated event", log)
+        self.assertNotIn("nf_udpPostSend event_tag=", log)
         self.assertNotIn(canary.decode(), log)
         self.assertNotIn(canary.hex(), log)
         self.assertNotIn("head=", log)

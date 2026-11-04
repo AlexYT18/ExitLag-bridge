@@ -122,6 +122,7 @@ if [[ "$tier" == system || "$tier" == system-only || "$tier" == live || "$tier" 
     run_test "TCP stale-map authorization" isolated python3 "$repo_root/tests/test-tcp-authorization.py"
     run_test "UDP synthetic observe"  isolated python3 "$repo_root/tests/test-udp-observe.py"
     run_test "UDP synthetic steer"    isolated python3 "$repo_root/tests/test-udp-observe.py" --steer
+    run_test "UDP multi-endpoint routing" isolated python3 "$repo_root/tests/test-udp-multi.py"
 fi
 
 # ---------------------------------------------------------------- live

@@ -169,6 +169,23 @@ static void disconnect_and_limits(void)
     close(fd[0]);
 }
 
+static void consumed_readiness(void)
+{
+    int fd[2]; pair(fd);
+    assert(exl_ipc_ready(fd[1]) == 0);
+    assert(exl_ipc_send_frame(fd[0], EXL_MSG_PONG, NULL, 0, exl_ipc_deadline_after(100)) == 0);
+    assert(exl_ipc_ready(fd[1]) == 1);
+    struct exl_header header; unsigned char payload[1];
+    assert(exl_ipc_recv_frame(fd[1], &header, payload, sizeof(payload), exl_ipc_deadline_after(100)) == 0);
+    assert(header.type == EXL_MSG_PONG);
+    assert(exl_ipc_ready(fd[1]) == 0); /* Old poll result must not trigger another read. */
+    close(fd[0]);
+    assert(exl_ipc_ready(fd[1]) == 1); /* Real EOF remains observable. */
+    close(fd[1]);
+    assert(exl_ipc_ready(fd[1]) == -1 && errno == EBADF);
+    assert(exl_ipc_ready(-1) == -1 && errno == EBADF);
+}
+
 int main(void)
 {
     roundtrip();
@@ -182,6 +199,7 @@ int main(void)
     blocked_writer();
     interrupted_reader();
     disconnect_and_limits();
+    consumed_readiness();
     puts("PASS: IPC framing, fragmentation, absolute deadlines, backpressure, EINTR and disconnects");
     return 0;
 }

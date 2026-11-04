@@ -21,6 +21,16 @@ exl_ipc_deadline exl_ipc_deadline_after(int timeout_ms)
     return now < 0 ? -1 : now + timeout_ms;
 }
 
+int exl_ipc_ready(int fd)
+{
+    if (fd < 0) { errno = EBADF; return -1; }
+    struct pollfd pending = {fd, POLLIN, 0};
+    int count = poll(&pending, 1, 0);
+    if (count < 0) return -1;
+    if (pending.revents & POLLNVAL) { errno = EBADF; return -1; }
+    return count && (pending.revents & (POLLIN | POLLHUP | POLLERR)) ? 1 : 0;
+}
+
 static int wait_ready(int fd, short events, exl_ipc_deadline deadline)
 {
     for (;;) {

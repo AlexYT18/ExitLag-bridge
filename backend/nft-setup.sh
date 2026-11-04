@@ -27,6 +27,7 @@ UDP_TEST_DEST="${UDP_TEST_DEST:-}"
 UDP_TEST_PORT="${UDP_TEST_PORT:-}"
 ENABLE_UDP_OBSERVE="${ENABLE_UDP_OBSERVE:-0}"
 ENABLE_UDP_STEER="${ENABLE_UDP_STEER:-0}"
+ENABLE_UDP_MULTI="${ENABLE_UDP_MULTI:-0}"
 user_match=""
 if [[ -n "${EXL_USER_UID:-}" ]]; then
     if ! [[ "$EXL_USER_UID" =~ ^[0-9]+$ ]] || (( EXL_USER_UID < 1000 )); then
@@ -94,7 +95,7 @@ if [[ "$ENABLE_UDP_OBSERVE" == 1 ]]; then
         udp_out_match="$udp_out_match udp dport $UDP_TEST_PORT"
         udp_in_match="$udp_in_match udp sport $UDP_TEST_PORT"
     fi
-    if [[ "$ENABLE_UDP_STEER" == 1 && -z "$UDP_TEST_PORT" ]]; then
+    if [[ "$ENABLE_UDP_STEER" == 1 && "$ENABLE_UDP_MULTI" != 1 && -z "$UDP_TEST_PORT" ]]; then
         echo "refusing UDP steering without an exact UDP_TEST_PORT" >&2
         exit 2
     fi
@@ -102,18 +103,24 @@ if [[ "$ENABLE_UDP_OBSERVE" == 1 ]]; then
     if [[ "$ENABLE_UDP_STEER" == 1 ]]; then
         udp_reinject_guard='meta mark 0x584c0001 counter accept'
     fi
+    udp_input_loopback='iifname "lo" accept'
+    if [[ "$ENABLE_UDP_MULTI" == 1 ]]; then
+        # Native attribution permits local-proxy replies only for a recorded,
+        # current-session reverse peer. Other loopback UDP remains untouched.
+        udp_input_loopback=""
+    fi
     read -r -d '' udp_chains <<NFT_UDP || true
 
     chain output_udp_observe {
         type filter hook output priority -10; policy accept;
         oifname "lo" accept
         $udp_reinject_guard
-        meta l4proto udp $udp_out_match queue num $UDP_QUEUE_NUM bypass
+        $user_match meta l4proto udp $udp_out_match queue num $UDP_QUEUE_NUM bypass
     }
 
     chain input_udp_observe {
         type filter hook input priority -10; policy accept;
-        iifname "lo" accept
+        $udp_input_loopback
         $udp_reinject_guard
         meta l4proto udp $udp_in_match queue num $UDP_QUEUE_NUM bypass
     }
