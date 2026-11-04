@@ -118,7 +118,7 @@ def main():
                      "test_linux_desktop.py", "test_linux_launcher.py", "test_mac_distribution.py",
                      "test_process_picker.py", "test_game_picker.py", "test_linux_packaging.py",
                      "test_source_audit.py", "test_runner.py", "test-integration-support.py",
-                     "test_benchmark_ipc.py", "test_llvm_toolchain.py"]
+                     "test_benchmark_ipc.py", "test_llvm_toolchain.py", "test_build_runtime.py"]
     for filename in python_suites:
         checks.run(filename, [sys.executable, "tests/" + filename], unit_test=True)
     checks.run("Tk process picker integration", [sys.executable, "tests/gui-picker-smoke.py"],

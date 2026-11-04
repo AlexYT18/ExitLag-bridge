@@ -128,9 +128,28 @@ python3 installers/build_runtime.py payloads --output installers/payloads
 python3 installers/linux/build.py --output build/releases
 ```
 
-On Arch Linux x86_64, after building the same required runtime payloads, use
-`python3 installers/linux/build.py --portable-only --output build/releases`.
-This produces the portable installer without `dpkg` or a Debian package. The
+On Arch Linux x86_64, the installed LLVM toolchain can build all required Linux
+payloads without downloading Zig:
+
+```sh
+sudo pacman -S --needed base-devel clang lld llvm bison flex m4 git
+make -C backend
+python3 installers/build_runtime.py payloads --toolchain llvm --arch x86_64 --output installers/payloads
+python3 installers/linux/build.py --portable-only --source-revision "$(git rev-parse HEAD)" --output build/releases
+cp build/installer/exitlag-bridge-wine-source.tar.gz build/releases/
+```
+
+Use a reviewed, committed tree for release builds. The `--source-revision` value
+is recorded in `program/build-info.json` with hashes for packaged program files;
+if omitted the revision is explicitly unknown (`null`). The Linux packaged shim preserves the core exports plus the two existing
+driver-management exports with explicit unsupported status; its normal `DllMain`
+entrypoint does not enable the macOS timer workaround. The exact combined export
+set is checked during payload construction. The builder verifies
+required payload hashes before staging and includes only the three Linux payloads.
+Unrelated files in `installers/payloads` are excluded. LLVM tool changes invalidate
+the cached Wine configuration; the legacy default Zig path is preserved.
+
+`--portable-only` produces the portable installer without `dpkg` or a Debian package. The
 builder does not download or include the proprietary ExitLag client. An absent
 `installers/payloads` directory must be built first; a source archive alone is
 not an installable runtime package.

@@ -6,8 +6,9 @@ linked below predates that interface. Updating a source checkout does not update
 an already installed program; build/install the updated program separately.
 This branch also adds a minimal game dashboard and an explicit, default-off
 experimental UDP toggle. [UDP scope and validation](udp-multi.md) describes its
-synthetic IPv4/IPv6 evidence and limits. This source iteration does not publish
-a new self-contained installer; the older download below lacks these changes.
+synthetic IPv4/IPv6 evidence and limits. The older upstream download below lacks
+these changes. Build the current portable program using the procedure below;
+a build alone does not establish live ExitLag or game compatibility.
 
 **WoW Classic Era gameplay has been verified by the maintainer on Arch Linux.**
 Use the same Linux x86_64 installer as Ubuntu 22.04 and 24.04.
@@ -15,6 +16,42 @@ Use the same Linux x86_64 installer as Ubuntu 22.04 and 24.04.
 
 [Download for Arch Linux](https://github.com/Cheaux/exitlag-bridge/releases/download/v0.4.0-alpha.2/exitlag-bridge-0.4.0-alpha.2-linux-x86_64.tar.gz)
 · [All platform downloads](https://cheaux.github.io/exitlag-bridge/#downloads)
+
+## Build the current development installer
+
+On Arch x86_64, install build tools in addition to the runtime dependencies below:
+
+```sh
+sudo pacman -S --needed base-devel clang lld llvm bison flex m4 git
+make -C backend
+python3 installers/build_runtime.py payloads --toolchain llvm --arch x86_64 --output installers/payloads
+python3 installers/linux/build.py --portable-only --source-revision "$(git rev-parse HEAD)" --output build/releases
+cp build/installer/exitlag-bridge-wine-source.tar.gz build/releases/
+```
+
+Build from a reviewed, committed source tree so the recorded revision identifies
+its actual sources. The LLVM path uses installed tools and downloads checksum-pinned
+Wine sources; it does not download Zig or package a synthetic game companion.
+The default Zig path remains available for existing build callers. Changing LLVM
+binaries invalidates the cached Wine configuration and PE objects.
+
+The native core shim retains its 18 exports. The packaged shim also preserves
+the two existing driver-management exports, which explicitly return unsupported;
+the Linux package uses the normal `DllMain` entrypoint and does not enable the
+macOS timer workaround. The builder checks the exact combined export-name set.
+
+The portable program includes the native helper, current dashboard, and real
+`nfapi.dll`, `nfextlag.sys`, and patched `wbemprox.dll` builds. Packaging verifies
+payload hashes and writes `program/build-info.json` with the requested source
+revision and individual program file hashes. It excludes unrelated payload files,
+account state and the proprietary installer. This manifest is integrity metadata,
+not a signature or proof of gameplay. Publish the matching bridge sources and the
+corresponding Wine source archive alongside the binary package.
+
+Extract `build/releases/exitlag-bridge-0.4.0+arch.1-linux-x86_64.tar.gz`, then run its
+`install.sh` as described below. Updating Git sources alone does not update
+`/usr/local/lib/exitlag-bridge`. Quit the running bridge before installing an update;
+the installer preserves the separate user setup directory.
 
 ## 1. Install dependencies
 

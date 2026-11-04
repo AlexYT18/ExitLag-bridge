@@ -44,11 +44,17 @@ class LinuxPackaging(unittest.TestCase):
                      'installers/bridge_setup/process_picker.py',
                      'installers/payloads/manifest.json',
                      'installers/payloads/nfapi.dll',
+                     'installers/payloads/nfextlag.sys',
+                     'installers/payloads/wbemprox.dll',
                      'LICENSES/fixture-notice', 'macos/app/BridgeIcon.svg',
                      'installers/linux/install.sh', 'installers/linux/uninstall.sh'):
             path = self.source / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text('fixture only: ' + name + '\n')
+        payloads = self.source / 'installers/payloads'
+        (payloads / 'manifest.json').write_text(json.dumps({'files': {
+            name: hashlib.sha256((payloads / name).read_bytes()).hexdigest()
+            for name in builder.PAYLOADS}}))
         # A developer tree can contain private runtime/account material, but
         # explicit program packaging must not collect that tree wholesale.
         for name in ('runtime/prefix/drive_c/ExitLag/ExitLag.exe',
@@ -96,6 +102,32 @@ class LinuxPackaging(unittest.TestCase):
                 expected = 0o755 if path.is_dir() or path.suffix == '.sh' or path.name == 'exitlag-netd' else 0o644
                 self.assertEqual(stat.S_IMODE(path.stat().st_mode), expected)
                 self.assertFalse(path.is_symlink())
+
+    def test_payload_hash_mismatch_and_symlink_are_refused_before_population(self):
+        payload = self.source / 'installers/payloads/nfapi.dll'
+        payload.write_bytes(b'changed fixture')
+        with self.assertRaisesRegex(ValueError, 'checksum mismatch'):
+            builder.populate(self.work / 'invalid')
+        self.assertFalse((self.work / 'invalid').exists())
+        payload.unlink()
+        payload.symlink_to(self.source / 'backend/exitlag-netd')
+        with self.assertRaisesRegex(ValueError, 'regular Linux payload'):
+            builder.populate(self.work / 'linked')
+
+    def test_program_manifest_records_revision_and_every_packaged_hash(self):
+        payloads = self.source / 'installers/payloads'
+        (payloads / 'unrelated.exe').write_bytes(b'private-fixture-canary')
+        target = self.work / 'program'
+        revision = 'a' * 40
+        builder.populate(target, revision)
+        info = json.loads((target / 'build-info.json').read_text())
+        self.assertEqual(info['source_revision'], revision)
+        self.assertFalse(info['live_exitlag_verified'])
+        self.assertEqual(set((target / 'installers/payloads').iterdir()),
+                         {target / 'installers/payloads' / name for name in (*builder.PAYLOADS, 'manifest.json')})
+        actual = {str(p.relative_to(target)): hashlib.sha256(p.read_bytes()).hexdigest()
+                  for p in target.rglob('*') if p.is_file() and p.name != 'build-info.json'}
+        self.assertEqual(info['files'], actual)
 
     def test_missing_picker_dependency_prevents_packaging(self):
         (self.source / 'tools/discover-game-processes.py').unlink()
