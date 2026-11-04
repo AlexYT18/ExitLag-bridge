@@ -203,7 +203,7 @@ class PrivateMapIOTests(unittest.TestCase):
 class FilteringTests(unittest.TestCase):
     def candidate(self, name, pid, kind='proton', appid='12345'):
         return SimpleNamespace(name=name, pid=pid, kind=kind, steam_appid=appid,
-                               executable=Path('/runtime/wine64-preloader'))
+                               executable=Path('/runtime/wine64-preloader'), transports=('udp',), socket_count=1)
 
     def test_games_with_shared_runtime_remain_separate_and_infrastructure_is_hidden(self):
         items = [self.candidate('wineserver', 1), self.candidate('Steam', 2),
@@ -216,6 +216,25 @@ class FilteringTests(unittest.TestCase):
         for query in ('GAME', '4242', 'PROTON', '12345'):
             with self.subTest(query=query): self.assertEqual(picker.visible_candidates(items, query), items)
         self.assertEqual(picker.visible_candidates(items, 'missing'), [])
+
+    def test_numeric_columns_sort_numbers_without_merging_processes(self):
+        items = [self.candidate('Same.exe', 100, appid='100'),
+                 self.candidate('Same.exe', 9, appid='9'),
+                 self.candidate('Other.exe', 20, appid=None)]
+        items[0].socket_count = 10
+        items[1].socket_count = 2
+        items[2].socket_count = 3
+        self.assertEqual([x.pid for x in picker.visible_candidates(items, sort_by='pid')], [9, 20, 100])
+        self.assertEqual([x.pid for x in picker.visible_candidates(items, sort_by='pid', descending=True)], [100, 20, 9])
+        self.assertEqual([x.pid for x in picker.visible_candidates(items, sort_by='sockets')], [9, 20, 100])
+        self.assertEqual([x.pid for x in picker.visible_candidates(items, sort_by='appid')], [9, 100, 20])
+        self.assertEqual([x.pid for x in picker.visible_candidates(items, 'same', sort_by='pid')], [9, 100])
+
+    def test_sorting_keeps_hidden_infrastructure_hidden(self):
+        items = [self.candidate('Steam', 2), self.candidate('Game.exe', 9)]
+        for column in ('name', 'pid', 'runtime', 'transport', 'sockets', 'appid'):
+            with self.subTest(column=column):
+                self.assertEqual(picker.visible_candidates(items, sort_by=column), items[1:])
 
 
 class WorkerTests(unittest.TestCase):

@@ -128,7 +128,7 @@ class MappingController:
         self.text = text
 
 
-def visible_candidates(candidates, query='', show_all=False):
+def visible_candidates(candidates, query='', show_all=False, sort_by=None, descending=False):
     query = query.casefold().strip()
     result = []
     for item in candidates:
@@ -137,6 +137,16 @@ def visible_candidates(candidates, query='', show_all=False):
         searchable = f'{item.name} {item.pid} {item.kind} {item.steam_appid or ""}'.casefold()
         if not query or query in searchable:
             result.append(item)
+    keys = {
+        'name': lambda item: (item.name.casefold(), item.pid),
+        'pid': lambda item: item.pid,
+        'runtime': lambda item: (item.kind.casefold(), item.name.casefold(), item.pid),
+        'transport': lambda item: (tuple(item.transports), item.pid),
+        'sockets': lambda item: (item.socket_count, item.pid),
+        'appid': lambda item: (not bool(item.steam_appid), int(item.steam_appid or 0), item.pid),
+    }
+    if sort_by is not None:
+        return sorted(result, key=keys[sort_by], reverse=descending)
     return sorted(result, key=lambda item: (not item.name.lower().endswith('.exe'), item.name.casefold(), item.pid))
 
 
@@ -229,6 +239,7 @@ class RunningGameDialog:
         self.closed = False
         self.candidates, self.images = [], []
         self.selected = self.manual_identity = None
+        self.sort_by, self.descending = None, False
         self.query, self.show_all = tk.StringVar(), tk.BooleanVar(value=False)
         self.status, self.details = tk.StringVar(value='Reading your network processes...'), tk.StringVar()
         body = ttk.Frame(self.window, padding=16)
@@ -239,6 +250,8 @@ class RunningGameDialog:
         ttk.Label(controls, text='Search').pack(side='left')
         self.search_entry = ttk.Entry(controls, textvariable=self.query)
         self.search_entry.pack(side='left', fill='x', expand=True, padx=8)
+        self.clear_button = ttk.Button(controls, text='Clear', command=self.clear_search)
+        self.clear_button.pack(side='left', padx=(0, 8))
         self.refresh_button = ttk.Button(controls, text='Refresh', command=self.refresh)
         self.refresh_button.pack(side='left')
         ttk.Checkbutton(body, text='Show all network processes', variable=self.show_all, command=self.render).pack(anchor='w')
@@ -246,7 +259,9 @@ class RunningGameDialog:
         frame = ttk.Frame(body); frame.pack(fill='both', expand=True, pady=8)
         self.process_tree = ttk.Treeview(frame, columns=columns, show='headings', selectmode='browse', height=10)
         for name, title, width in zip(columns, ('Game / process', 'PID', 'Runtime', 'Transport', 'Sockets', 'Steam AppID'), (260, 70, 105, 100, 70, 100)):
-            self.process_tree.heading(name, text=title); self.process_tree.column(name, width=width, minwidth=55)
+            self.process_tree.heading(name, text=title, command=lambda column=name: self.sort(column))
+            self.process_tree.column(name, width=width, minwidth=55)
+        self.column_titles = dict(zip(columns, ('Game / process', 'PID', 'Runtime', 'Transport', 'Sockets', 'Steam AppID')))
         scrollbar = ttk.Scrollbar(frame, orient='vertical', command=self.process_tree.yview)
         self.process_tree.configure(yscrollcommand=scrollbar.set)
         self.process_tree.pack(side='left', fill='both', expand=True); scrollbar.pack(side='right', fill='y')
@@ -262,7 +277,8 @@ class RunningGameDialog:
         advanced = ttk.Frame(body); advanced.pack(fill='x', pady=8)
         ttk.Button(advanced, text='Advanced identity...', command=self.advanced_identity).pack(side='left')
         ttk.Label(body, text='Select the same game in official ExitLag. A file match does not verify service recognition or relay traffic.', wraplength=920).pack(anchor='w')
-        ttk.Label(body, text='This launcher routes TCP. UDP sockets shown here are discovery only.', wraplength=920).pack(anchor='w', pady=(4, 8))
+        self.transport_note = ttk.Label(body, text='TCP is enabled by default. Experimental UDP can be enabled in the dashboard before launching; listed sockets do not verify routing.', wraplength=920)
+        self.transport_note.pack(anchor='w', pady=(4, 8))
         ttk.Label(body, textvariable=self.status, wraplength=920).pack(anchor='w')
         bottom = ttk.Frame(body); bottom.pack(fill='x', pady=(10, 0))
         self.add_button = ttk.Button(bottom, text='Add selected game', command=self.add, state='disabled')
@@ -270,7 +286,11 @@ class RunningGameDialog:
         self.query.trace_add('write', lambda *_: self.render())
         self.window.protocol('WM_DELETE_WINDOW', self.close)
         self.window.bind('<Destroy>', self._destroyed)
+        self.window.bind('<Control-f>', self.focus_search)
+        self.window.bind('<F5>', self.refresh_key)
+        self.search_entry.bind('<Down>', self.focus_processes)
         self.window.grab_set()
+        self.search_entry.focus_set()
         self.timer = self.window.after(50, self.poll)
         self.refresh()
 
@@ -292,8 +312,43 @@ class RunningGameDialog:
             self.status.set(str(error))
             return False
 
+    def focus_search(self, _event=None):
+        self.search_entry.focus_set()
+        self.search_entry.selection_range(0, 'end')
+        return 'break'
+
+    def clear_search(self):
+        self.query.set('')
+        self.focus_search()
+
+    def focus_processes(self, _event=None):
+        entries = self.process_tree.get_children()
+        if entries:
+            self.process_tree.focus_set()
+            selected = self.process_tree.selection()
+            entry = selected[0] if selected else entries[0]
+            self.process_tree.selection_set(entry)
+            self.process_tree.focus(entry)
+            self.process_tree.see(entry)
+        return 'break'
+
+    def refresh_key(self, _event=None):
+        if not self.refresh_button.instate(['disabled']):
+            self.refresh()
+        return 'break'
+
+    def sort(self, column):
+        self.descending = not self.descending if self.sort_by == column else False
+        self.sort_by = column
+        for name, title in self.column_titles.items():
+            suffix = (' ▼' if self.descending else ' ▲') if name == column else ''
+            self.process_tree.heading(name, text=title + suffix)
+        self.render()
+
     def refresh(self):
         self.selected = self.manual_identity = None
+        self.process_tree.delete(*self.process_tree.get_children())
+        self.details.set('')
         self.images = []; self.image_combo.configure(values=()); self.image_combo.set('')
         self.add_button.state(['disabled']); self.browse_button.state(['disabled'])
         self.tasks.cancel('images'); self.tasks.cancel('file'); self.tasks.cancel('mapping')
@@ -308,24 +363,34 @@ class RunningGameDialog:
             self.refresh_button.state(['!disabled'])
 
     def render(self):
-        previous = self.process_tree.selection()
-        self.process_tree.delete(*self.process_tree.get_children())
-        for item in visible_candidates(self.candidates, self.query.get(), self.show_all.get()):
+        items = visible_candidates(self.candidates, self.query.get(), self.show_all.get(),
+                                   self.sort_by, self.descending)
+        visible_ids = {f'{item.pid}:{item.start_time}' for item in items}
+        for entry in self.process_tree.get_children():
+            if entry not in visible_ids:
+                self.process_tree.delete(entry)
+        for position, item in enumerate(items):
             iid = f'{item.pid}:{item.start_time}'
-            self.process_tree.insert('', 'end', iid=iid, values=(item.name, item.pid, item.kind.title(), '/'.join(p.upper() for p in item.transports), item.socket_count, item.steam_appid or '-'))
-        if previous and self.process_tree.exists(previous[0]):
-            self.process_tree.selection_set(previous[0])
-        elif self.selected is not None:
+            values = (item.name, item.pid, item.kind.title(), '/'.join(p.upper() for p in item.transports), item.socket_count, item.steam_appid or '-')
+            if self.process_tree.exists(iid):
+                self.process_tree.item(iid, values=values)
+                self.process_tree.move(iid, '', position)
+            else:
+                self.process_tree.insert('', position, iid=iid, values=values)
+        if self.selected is not None and f'{self.selected.pid}:{self.selected.start_time}' not in visible_ids:
             self.selected = self.manual_identity = None; self.images = []
-            self.image_combo.configure(values=()); self.image_combo.set(''); self.add_button.state(['disabled'])
-        visible = len(self.process_tree.get_children())
+            self.tasks.cancel('images'); self.tasks.cancel('file'); self.tasks.cancel('mapping')
+            self.image_combo.configure(values=()); self.image_combo.set('')
+            self.add_button.state(['disabled']); self.browse_button.state(['disabled'])
+            self.details.set('')
+        visible = len(items)
         self.status.set(f'{visible} process(es) shown. Select a game.' if visible else 'No matching game found. Open a game session, Refresh, or Show all network processes.')
 
     def select(self, _event=None):
         selection = self.process_tree.selection()
         if not selection: return
         item = next((c for c in self.candidates if f'{c.pid}:{c.start_time}' == selection[0]), None)
-        if item is None: return
+        if item is None or item == self.selected: return
         self.selected, self.manual_identity, self.images = item, None, []
         self.tasks.cancel('images'); self.tasks.cancel('file'); self.tasks.cancel('mapping')
         self.image_combo.configure(values=()); self.image_combo.set(''); self.add_button.state(['disabled'])
