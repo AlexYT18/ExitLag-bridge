@@ -141,9 +141,11 @@ def main():
     checks.run("Native TCP attribution", ["make", "-B", "-C", "backend", "check-tcp-attribution"], needs=("make", compiler), reason=loopback_reason)
     checks.run("Native process identity", ["make", "-B", "-C", "backend", "check-process-identity"], needs=("make", compiler), reason=loopback_reason)
     for target, name in (("check-udp-attribution", "attribution"),
-                         ("check-udp-packet", "packet codec"), ("check-udp-peers", "peer lifecycle")):
+                         ("check-udp-packet", "packet codec"), ("check-udp-peers", "peer lifecycle"),
+                         ("check-udp-lifecycle", "maintenance scheduler"),
+                         ("check-udp-maintenance", "daemon maintenance")):
         checks.run("Native UDP " + name, ["make", "-B", "-C", "backend", target],
-                   needs=("make", compiler), reason=loopback_reason if target == "check-udp-attribution" else "")
+                   needs=("make", compiler), reason=loopback_reason if target in ("check-udp-attribution", "check-udp-maintenance") else "")
     checks.run("Shim socket attribution", ["bash", "tests/test-shim-attribution.sh"], needs=("bash", cxx[0] if cxx else "c++"))
     checks.run("Shim worker lifecycle", ["bash", "tests/test-shim-lifecycle.sh"], needs=("bash", cxx[0] if cxx else "c++"))
     checks.run("Shim PID domains", ["bash", "tests/test-shim-pid-domain.sh"], needs=("bash", cxx[0] if cxx else "c++"))
@@ -180,10 +182,12 @@ def main():
         for target, name in (("check-tcp-attribution", "TCP attribution"), ("check-process-identity", "process identity")):
             checks.run("ASan UBSan native " + name, ["make", "-B", "-C", "backend", target, "CFLAGS=" + flags, "LDFLAGS=" + links], needs=("make", compiler), env=sanitizer_env, reason=loopback_reason)
         for target, name in (("check-udp-attribution", "UDP attribution"), ("check-udp-packet", "UDP packet codec"),
-                             ("check-udp-peers", "UDP peer lifecycle")):
+                             ("check-udp-peers", "UDP peer lifecycle"),
+                             ("check-udp-lifecycle", "UDP maintenance scheduler"),
+                             ("check-udp-maintenance", "UDP daemon maintenance")):
             checks.run("ASan UBSan native " + name, ["make", "-B", "-C", "backend", target,
                        "CFLAGS=" + flags, "LDFLAGS=" + links], needs=("make", compiler), env=sanitizer_env,
-                       reason=loopback_reason if target == "check-udp-attribution" else "")
+                       reason=loopback_reason if target in ("check-udp-attribution", "check-udp-maintenance") else "")
         checks.run("ASan UBSan shim socket attribution", ["bash", "tests/test-shim-attribution.sh", "--sanitize"], needs=("bash", cxx[0] if cxx else "c++"), env=sanitizer_env)
         checks.run("ASan UBSan shim worker lifecycle", ["bash", "tests/test-shim-lifecycle.sh", "--sanitize"], needs=("bash", cxx[0] if cxx else "c++"), env=sanitizer_env)
         checks.run("ASan UBSan shim PID domains", ["bash", "tests/test-shim-pid-domain.sh", "--sanitize"], needs=("bash", cxx[0] if cxx else "c++"), env=sanitizer_env)

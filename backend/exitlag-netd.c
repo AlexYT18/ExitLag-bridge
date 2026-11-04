@@ -58,6 +58,7 @@
 #include "udp_attribution.h"
 #include "udp_packet.h"
 #include "udp_peers.h"
+#include "udp_lifecycle.h"
 
 /*
  * Wine hands the socket fd to the application only after wineserver has created
@@ -204,10 +205,12 @@ struct udp_endpoint {
     unsigned int active_ordinal;
     unsigned long long datagrams_out;
     unsigned long long datagrams_in;
-    struct timespec last_seen;
+    uint64_t last_seen_ms;
     char exe[256];
 };
 static struct udp_endpoint g_udp_endpoints[UDP_ENDPOINT_MAX];
+static struct udp_reaper g_udp_reaper;
+static uint64_t g_udp_capacity_refusals, g_udp_capacity_next_log;
 
 struct udp_post_capture {
     unsigned int count;
@@ -225,6 +228,7 @@ static struct udp_post_capture g_udp_post;
 static void udp_reset_session(void)
 {
     memset(g_udp_endpoints, 0, sizeof(g_udp_endpoints));
+    memset(&g_udp_reaper, 0, sizeof(g_udp_reaper));
     memset(&g_udp_post, 0, sizeof(g_udp_post));
     g_udp_active_endpoint = 0; g_udp_eligible_endpoint_count = 0;
     if (++g_udp_session == 0) ++g_udp_session;
@@ -1011,11 +1015,13 @@ static int ask_shim_tcp_connect(struct exl_tcp_connect_req *req, struct exl_tcp_
 }
 
 static int ask_shim_udp_lifecycle(struct exl_udp_lifecycle_req *req, int created,
-                                  struct exl_udp_lifecycle_reply *reply)
+                                  struct exl_udp_lifecycle_reply *reply,
+                                  exl_ipc_deadline limit)
 {
     unsigned short request_type = created ? EXL_MSG_UDP_CREATED_REQ : EXL_MSG_UDP_CLOSED_REQ;
     unsigned short reply_type = created ? EXL_MSG_UDP_CREATED_REPLY : EXL_MSG_UDP_CLOSED_REPLY;
     exl_ipc_deadline deadline = exl_ipc_deadline_after(g_reply_timeout_ms);
+    if (limit > 0 && limit < deadline) deadline = limit;
     if (g_shim_fd < 0) return -1;
     if (exl_ipc_send_frame(g_shim_fd, request_type, req, sizeof(*req), deadline) != 0) {
         drop_shim("UDP lifecycle write failed or timed out"); return -1;
@@ -1157,7 +1163,7 @@ static void format_endpoint(char *buf, size_t len, int family, const void *addr,
              family == AF_INET ? "" : "]", ntohs(port_net));
 }
 
-static int udp_emit_lifecycle(struct udp_endpoint *endpoint, int created)
+static int udp_emit_lifecycle(struct udp_endpoint *endpoint, int created, exl_ipc_deadline limit)
 {
     struct exl_udp_lifecycle_req req;
     memset(&req, 0, sizeof(req));
@@ -1168,7 +1174,7 @@ static int udp_emit_lifecycle(struct udp_endpoint *endpoint, int created)
     memcpy(req.local_address, endpoint->local_address, 28);
     struct exl_udp_lifecycle_reply reply;
     memset(&reply, 0, sizeof(reply));
-    if (ask_shim_udp_lifecycle(&req, created, &reply) != 0 ||
+    if (ask_shim_udp_lifecycle(&req, created, &reply, limit) != 0 ||
         reply.verdict > EXL_VERDICT_MUTATED || reply.ip_family != req.ip_family) {
         log_line("udp %s tag=%llu id=0x%llx pid=%d exe=%s | no shim reply; packet remains unchanged",
                  created ? "created" : "closed", req.tag, endpoint->id, endpoint->linux_pid,
@@ -1209,16 +1215,22 @@ static int udp_tuple_valid(const struct udp_endpoint *endpoint,
         inode == endpoint->inode && udp_owner_valid(endpoint);
 }
 
-static void udp_retire(struct udp_endpoint *endpoint, const char *reason)
+static void udp_retire_until(struct udp_endpoint *endpoint, const char *reason,
+                              exl_ipc_deadline limit)
 {
     unsigned long long id = endpoint->id;
     unsigned long long out = endpoint->datagrams_out, in = endpoint->datagrams_in;
     unsigned int rules = endpoint->remote_rule_unique_count;
     if (endpoint->created_sent && endpoint->session == g_udp_session)
-        udp_emit_lifecycle(endpoint, 0);
+        udp_emit_lifecycle(endpoint, 0, limit);
     memset(endpoint, 0, sizeof(*endpoint));
     log_line("udp endpoint release id=0x%llx reason=%s datagrams={out=%llu,in=%llu} remote_rules_deleted=%u",
              id, reason, out, in, rules);
+}
+
+static void udp_retire(struct udp_endpoint *endpoint, const char *reason)
+{
+    udp_retire_until(endpoint, reason, 0);
 }
 
 static struct udp_endpoint *udp_reverse_endpoint(int family, const unsigned char local[28],
@@ -1256,14 +1268,18 @@ static struct udp_endpoint *udp_endpoint_get(int family, const void *local_ip,
         if (udp_packet_endpoint_from_wire(family, remote, &peer) != UDP_PACKET_OK) return NULL;
         /* Local proxy replies need a previously authorized binding. Do not
            inspect unrelated desktop loopback UDP just because input is queued. */
-        if (udp_post_is_loopback(&peer)) return udp_reverse_endpoint(family, local, remote);
+        if (udp_post_is_loopback(&peer)) {
+            struct udp_endpoint *reverse = udp_reverse_endpoint(family, local, remote);
+            if (reverse) udp_activity_touch(&reverse->last_seen_ms, monotonic_ms());
+            return reverse;
+        }
     }
     unsigned long inode = 0;
     enum udp_attribution_result attribution = udp_attribution_lookup(
         family, local_ip, ntohs(local_port_net), remote_ip, ntohs(remote_port_net), &inode);
     if (attribution == UDP_ATTR_NONE && direction == EXL_DIR_IN && g_udp_multi) {
         struct udp_endpoint *reverse = udp_reverse_endpoint(family, local, remote);
-        if (reverse) clock_gettime(CLOCK_MONOTONIC, &reverse->last_seen);
+        if (reverse) udp_activity_touch(&reverse->last_seen_ms, monotonic_ms());
         return reverse;
     }
     if (attribution != UDP_ATTR_FOUND) return NULL;
@@ -1286,7 +1302,7 @@ static struct udp_endpoint *udp_endpoint_get(int family, const void *local_ip,
                 udp_retire(endpoint, "executable-identity-changed");
                 continue;
             }
-            clock_gettime(CLOCK_MONOTONIC, &endpoint->last_seen);
+            udp_activity_touch(&endpoint->last_seen_ms, monotonic_ms());
             return endpoint;
         }
         if (!memcmp(endpoint->local_address, local, 28) && !udp_owner_valid(endpoint))
@@ -1297,7 +1313,14 @@ static struct udp_endpoint *udp_endpoint_get(int family, const void *local_ip,
     for (unsigned int i = 0; i < UDP_ENDPOINT_MAX; ++i)
         if (!g_udp_endpoints[i].used) { endpoint = &g_udp_endpoints[i]; break; }
     if (!endpoint || !g_next_endpoint) {
-        log_line("udp endpoint capacity exhausted; accepting unchanged"); return NULL;
+        uint64_t now = monotonic_ms();
+        if (g_udp_capacity_refusals != UINT64_MAX) ++g_udp_capacity_refusals;
+        if (now >= g_udp_capacity_next_log) {
+            log_line("udp endpoint capacity exhausted; accepting unchanged; total_refusals=%llu",
+                     (unsigned long long)g_udp_capacity_refusals);
+            g_udp_capacity_next_log = now > UINT64_MAX - 1000 ? UINT64_MAX : now + 1000;
+        }
+        return NULL;
     }
     memset(endpoint, 0, sizeof(*endpoint));
     endpoint->used = 1; endpoint->family = family; endpoint->id = g_next_endpoint++;
@@ -1305,7 +1328,7 @@ static struct udp_endpoint *udp_endpoint_get(int family, const void *local_ip,
     endpoint->session = g_udp_session; endpoint->filtering_flag = 0x12;
     memcpy(endpoint->local_address, local, 28);
     snprintf(endpoint->exe, sizeof(endpoint->exe), "%s", exe);
-    clock_gettime(CLOCK_MONOTONIC, &endpoint->last_seen);
+    udp_activity_touch(&endpoint->last_seen_ms, monotonic_ms());
     return endpoint;
 }
 
@@ -1342,17 +1365,28 @@ static int udp_emit_connect(struct udp_endpoint *endpoint, const unsigned char r
 
 static void udp_reap_endpoints(void)
 {
-    static time_t last_reap;
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    if (now.tv_sec == last_reap) return;
-    last_reap = now.tv_sec;
-    for (unsigned int i = 0; i < UDP_ENDPOINT_MAX; ++i) {
-        struct udp_endpoint *endpoint = &g_udp_endpoints[i];
+    uint64_t now = monotonic_ms();
+    if (!udp_reaper_begin(&g_udp_reaper, UDP_ENDPOINT_MAX, now,
+                          (uint64_t)g_reply_timeout_ms)) return;
+    uint64_t session = g_udp_session;
+    exl_ipc_deadline deadline = (exl_ipc_deadline)g_udp_reaper.deadline;
+    unsigned int retired = 0;
+    size_t index;
+    /* Yield both by work count and wall time. One full configured RPC timeout
+       is shared by the entire turn, including nested control/PID messages. */
+    while (retired < 4 && udp_reaper_next(&g_udp_reaper, UDP_ENDPOINT_MAX,
+                                         monotonic_ms(), &index)) {
+        struct udp_endpoint *endpoint = &g_udp_endpoints[index];
         if (!endpoint->used) continue;
-        long long idle = now.tv_sec - endpoint->last_seen.tv_sec;
-        if (idle >= 60 || (idle >= 2 && !udp_owner_valid(endpoint)))
-            udp_retire(endpoint, idle >= 60 ? "idle-timeout" : "socket-or-process-closed");
+        uint64_t idle = udp_activity_idle(endpoint->last_seen_ms, monotonic_ms());
+        if (idle >= 60000 || (idle >= 2000 && !udp_owner_valid(endpoint))) {
+            udp_retire_until(endpoint, idle >= 60000 ? "idle-timeout" : "socket-or-process-closed",
+                             deadline);
+            ++retired;
+            /* An RPC timeout or hostile nested frame can reset every endpoint
+               and the scheduler. Do not continue a scan in the new session. */
+            if (session != g_udp_session) break;
+        }
     }
 }
 
@@ -1501,7 +1535,7 @@ static void observe_udp_packet(int queue_num, unsigned int packet_id,
                                                     remote->address, remote->port_net, direction);
     if (!endpoint) { send_verdict(queue_num, packet_id, NF_ACCEPT); return; }
     if (!endpoint->created_sent) {
-        if (udp_emit_lifecycle(endpoint, 1) != 0 || !udp_owner_valid(endpoint)) {
+        if (udp_emit_lifecycle(endpoint, 1, 0) != 0 || !udp_owner_valid(endpoint)) {
             send_verdict(queue_num, packet_id, NF_ACCEPT); return;
         }
         endpoint->created_sent = 1;

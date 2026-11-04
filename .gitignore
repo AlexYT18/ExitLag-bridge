@@ -84,4 +84,6 @@ backend/nfq-verdict-test
 backend/udp-attribution-test
 backend/udp-packet-test
 backend/udp-peers-test
+backend/udp-lifecycle-test
+backend/udp-maintenance-test
 *.pyc
