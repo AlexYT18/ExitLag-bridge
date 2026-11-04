@@ -10,6 +10,7 @@
 #include "tcp_callback_policy.h"
 #include "pid_domain.h"
 #include "udp_validation.h"
+#include "worker_lifecycle.h"
 
 typedef void *HANDLE;
 typedef unsigned long DWORD;
@@ -70,6 +71,15 @@ __declspec(dllimport) BOOL WINAPI GetFileSizeEx(HANDLE, unsigned __int64 *);
 __declspec(dllimport) BOOL WINAPI MoveFileExW(const wchar_t *, const wchar_t *, DWORD);
 __declspec(dllimport) HANDLE WINAPI CreateThread(void *, unsigned __int64, DWORD (WINAPI *)(void *), void *, DWORD, DWORD *);
 __declspec(dllimport) void WINAPI Sleep(DWORD);
+__declspec(dllimport) DWORD WINAPI WaitForSingleObject(HANDLE, DWORD);
+__declspec(dllimport) int WINAPI shutdown(SOCKET, int);
+__declspec(dllimport) int WINAPI WSACleanup();
+__declspec(dllimport) int WINAPI WSAGetLastError();
+__declspec(dllimport) int WINAPI ioctlsocket(SOCKET, long, unsigned long *);
+__declspec(dllimport) int WINAPI getsockopt(SOCKET, int, int, char *, int *);
+struct exl_fd_set { unsigned int count; SOCKET sockets[64]; };
+struct exl_timeval { long seconds, microseconds; };
+__declspec(dllimport) int WINAPI select(int, exl_fd_set *, exl_fd_set *, exl_fd_set *, const exl_timeval *);
 }
 #define GENERIC_READ 0x80000000UL
 #define OPEN_EXISTING 3UL
@@ -796,6 +806,7 @@ namespace inject {
 static NF_EventHandler *g_handler;
 static volatile long g_running;
 static HANDLE g_thread;
+static DWORD g_thread_id;
 
 static bool read_env(const wchar_t *name, wchar_t *buf, DWORD cap)
 {
@@ -1158,7 +1169,7 @@ static DWORD WINAPI thread_main(void *)
         ((cb_void)slot(0))(g_handler);
     }
     static char buffer[65536];
-    while (g_running) {
+    while (__atomic_load_n(&g_running, __ATOMIC_ACQUIRE)) {
         HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
         if (file == INVALID_HANDLE_VALUE) { Sleep(200); continue; }
         DWORD got = 0;
@@ -1167,7 +1178,7 @@ static DWORD WINAPI thread_main(void *)
         DeleteFileW(path);
         buffer[got] = 0;
         char *line = buffer;
-        while (*line) {
+        while (*line && __atomic_load_n(&g_running, __ATOMIC_ACQUIRE)) {
             char *end = line;
             while (*end && *end != '\n' && *end != '\r') ++end;
             char saved = *end; *end = 0;
@@ -1183,18 +1194,19 @@ static DWORD WINAPI thread_main(void *)
     return 0;
 }
 
-static void start(NF_EventHandler *handler)
+static bool start(NF_EventHandler *handler)
 {
     wchar_t path[1024];
-    if (!handler || !read_env(L"EXITLAG_NFAPI_INJECT", path, sizeof(path) / sizeof(path[0]))) return;
-    g_handler = handler; g_running = 1;
-    g_thread = CreateThread(0, 0, thread_main, 0, 0, 0);
+    if (!handler || !read_env(L"EXITLAG_NFAPI_INJECT", path, sizeof(path) / sizeof(path[0]))) return true;
+    __atomic_store_n(&g_running, 1, __ATOMIC_RELEASE);
+    g_thread = CreateThread(0, 0, thread_main, 0, 0, &g_thread_id);
+    if (!g_thread) __atomic_store_n(&g_running, 0, __ATOMIC_RELEASE);
+    return g_thread != 0;
 }
 
 static void stop()
 {
-    g_running = 0;
-    g_thread = 0;
+    __atomic_store_n(&g_running, 0, __ATOMIC_RELEASE);
 }
 
 } // namespace inject
@@ -1217,6 +1229,9 @@ static void stop()
 namespace ipc {
 
 static volatile long g_running;
+static HANDLE g_thread;
+static DWORD g_thread_id;
+static volatile long g_socket_lock;
 static SOCKET g_socket = INVALID_SOCKET;
 static unsigned __int64 g_tag;
 static volatile long g_send_lock;
@@ -1233,8 +1248,8 @@ struct udp_event_context {
     udp_event_context *previous;
 };
 
-// The TLS slot lives as long as the DLL. nf_free does not yet join every
-// worker, so freeing/reusing this slot there would expose stale callbacks.
+// Keep the TLS slot for the DLL lifetime; worker contexts are cleared before
+// their buffers are freed, including callback-initiated deferred teardown.
 static DWORD g_udp_tls = 0xffffffffUL;
 static volatile long g_udp_tls_state;
 
@@ -1877,6 +1892,63 @@ static bool read_session_token(unsigned char *out)
     return true;
 }
 
+static void socket_lock()
+{
+    while (__atomic_exchange_n(&g_socket_lock, 1, __ATOMIC_ACQUIRE)) Sleep(0);
+}
+
+static void publish_socket(SOCKET s)
+{
+    socket_lock();
+    __atomic_store_n(&g_socket, s, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_socket_lock, 0, __ATOMIC_RELEASE);
+}
+
+static void release_socket(SOCKET s)
+{
+    socket_lock();
+    __atomic_store_n(&g_socket, INVALID_SOCKET, __ATOMIC_RELEASE);
+    closesocket(s);
+    __atomic_store_n(&g_socket_lock, 0, __ATOMIC_RELEASE);
+}
+
+static void retry_pause()
+{
+    for (unsigned i = 0; i < 40 && __atomic_load_n(&g_running, __ATOMIC_ACQUIRE); ++i)
+        Sleep(50);
+}
+
+// Loopback is not a guarantee that SYN receives an answer: a local firewall
+// may silently drop it. Poll a nonblocking connect so nf_free can revoke it.
+static bool connect_cancellable(SOCKET s, const void *address)
+{
+    unsigned long nonblocking = 1;
+    if (ioctlsocket(s, (long)0x8004667eUL /* FIONBIO */, &nonblocking) != 0) return false;
+    bool connected = connect(s, address, 16) == 0;
+    if (!connected) {
+        int error = WSAGetLastError();
+        if (error != 10035 /* WSAEWOULDBLOCK */ && error != 10036 /* WSAEINPROGRESS */ &&
+            error != 10037 /* WSAEALREADY */) return false;
+    }
+    unsigned __int64 deadline = GetTickCount64() + 5000;
+    while (!connected && __atomic_load_n(&g_running, __ATOMIC_ACQUIRE) &&
+           GetTickCount64() < deadline) {
+        exl_fd_set writable; writable.count = 1; writable.sockets[0] = s;
+        exl_fd_set failed; failed.count = 1; failed.sockets[0] = s;
+        exl_timeval wait = {0, 100000};
+        int result = select(0, 0, &writable, &failed, &wait);
+        if (result < 0) return false;
+        if (result == 0) continue;
+        int error = -1, length = sizeof(error);
+        if (getsockopt(s, SOL_SOCKET_, 0x1007 /* SO_ERROR */, (char *)&error, &length) != 0 ||
+            length != sizeof(error) || error != 0 || failed.count != 0) return false;
+        connected = writable.count != 0;
+    }
+    if (!connected || !__atomic_load_n(&g_running, __ATOMIC_ACQUIRE)) return false;
+    nonblocking = 0;
+    return ioctlsocket(s, (long)0x8004667eUL, &nonblocking) == 0;
+}
+
 static DWORD WINAPI thread_main(void *)
 {
     wchar_t endpoint[128];
@@ -1891,20 +1963,21 @@ static DWORD WINAPI thread_main(void *)
     }
 
     char winsock_data[512];
-    WSAStartup(0x0202, winsock_data);
+    if (WSAStartup(0x0202, winsock_data) != 0) return 0;
 
-    // A previous nf_free worker can still be unwinding. Keep receive bytes and
-    // UDP before-images and socket owner tables private to each worker.
+    // Receive bytes, UDP before-images and owner tables belong to this worker.
     HANDLE heap = GetProcessHeap();
     char *payload = (char *)HeapAlloc(heap, 0, OWNER_TABLE_OFFSET + OWNER_TABLE_CAPACITY);
-    if (!payload) return 0;
+    if (!payload) { WSACleanup(); return 0; }
 
-    while (g_running) {
+    while (__atomic_load_n(&g_running, __ATOMIC_ACQUIRE)) {
         SOCKET s = socket(2 /*AF_INET*/, 1 /*SOCK_STREAM*/, 6 /*IPPROTO_TCP*/);
-        if (s == INVALID_SOCKET) { Sleep(2000); continue; }
-        if (connect(s, address, 16) == SOCKET_ERROR) {
-            closesocket(s);
-            Sleep(2000);           // helper absent: keep retrying, never block ExitLag
+        if (s == INVALID_SOCKET) { retry_pause(); continue; }
+        publish_socket(s);
+        if (!__atomic_load_n(&g_running, __ATOMIC_ACQUIRE)) { release_socket(s); break; }
+        if (!connect_cancellable(s, address)) {
+            release_socket(s);
+            retry_pause();         // helper absent: keep retrying, never block ExitLag
             continue;
         }
         int one = 1;
@@ -1918,9 +1991,7 @@ static DWORD WINAPI thread_main(void *)
         setsockopt(s, SOL_SOCKET_, SO_SNDTIMEO_, (const char *)&io_timeout_ms, sizeof(io_timeout_ms));
         setsockopt(s, SOL_SOCKET_, SO_RCVTIMEO_, (const char *)&io_timeout_ms, sizeof(io_timeout_ms));
         unsigned __int64 session = __atomic_add_fetch(&g_udp_session, 1, __ATOMIC_ACQ_REL);
-        __atomic_store_n(&g_socket, s, __ATOMIC_RELEASE);
-        // Bind the request stream to THIS worker. A legacy unjoined worker
-        // cannot borrow a replacement worker's socket or epoch via globals.
+        // Bind requests to this worker and this connection epoch.
         udp_event_context transport = {};
         transport.session = session; transport.socket = s;
         transport.scratch = (unsigned char *)payload + EXL_MAX_PAYLOAD;
@@ -1928,8 +1999,7 @@ static DWORD WINAPI thread_main(void *)
         transport.owner_table = (unsigned char *)payload + OWNER_TABLE_OFFSET;
         if (!ensure_udp_tls() || !TlsSetValue(g_udp_tls, &transport)) {
             __atomic_add_fetch(&g_udp_session, 1, __ATOMIC_ACQ_REL);
-            __atomic_store_n(&g_socket, INVALID_SOCKET, __ATOMIC_RELEASE);
-            closesocket(s); Sleep(2000); continue;
+            release_socket(s); retry_pause(); continue;
         }
 
         exl_hello hello; hello.version = EXL_PROTOCOL_VERSION;
@@ -1942,8 +2012,7 @@ static DWORD WINAPI thread_main(void *)
         if (!have_token) {
             TlsSetValue(g_udp_tls, 0);
             __atomic_add_fetch(&g_udp_session, 1, __ATOMIC_ACQ_REL);
-            __atomic_store_n(&g_socket, INVALID_SOCKET, __ATOMIC_RELEASE);
-            closesocket(s); Sleep(2000); continue;
+            release_socket(s); retry_pause(); continue;
         }
 
         {
@@ -1954,12 +2023,13 @@ static DWORD WINAPI thread_main(void *)
             trace::finish(out);
         }
 
-        while (ok && g_running) {
+        while (ok && __atomic_load_n(&g_running, __ATOMIC_ACQUIRE)) {
             exl_header head;
             if (!recv_all(s, (char *)&head, (int)sizeof(head))) break;
             if (!exl_ipc_validation::valid_frame_header(head)) break;
             if (head.length && !recv_all(s, payload, (int)head.length)) break;
 
+            if (!__atomic_load_n(&g_running, __ATOMIC_ACQUIRE)) break;
             if (head.type == EXL_MSG_HELLO_ACK && head.length >= sizeof(exl_hello_ack)) {
                 const exl_hello_ack *ack = (const exl_hello_ack *)payload;
                 trace::line out; trace::prefix(out, "ipc.hello_ack");
@@ -2004,30 +2074,81 @@ static DWORD WINAPI thread_main(void *)
 
         TlsSetValue(g_udp_tls, 0);
         __atomic_add_fetch(&g_udp_session, 1, __ATOMIC_ACQ_REL);
-        __atomic_store_n(&g_socket, INVALID_SOCKET, __ATOMIC_RELEASE);
-        closesocket(s);
+        release_socket(s);
         { trace::line out; trace::prefix(out, "ipc.disconnect"); trace::finish(out); }
-        if (g_running) Sleep(2000);
+        retry_pause();
     }
     HeapFree(heap, 0, payload);
+    WSACleanup();
     return 0;
 }
 
-static void start()
+static bool start()
 {
     wchar_t endpoint[128];
-    if (!GetEnvironmentVariableW(L"EXITLAG_NETD", endpoint, sizeof(endpoint) / sizeof(endpoint[0]))) return;
-    g_running = 1;
-    CreateThread(0, 0, thread_main, 0, 0, 0);
+    if (!GetEnvironmentVariableW(L"EXITLAG_NETD", endpoint, sizeof(endpoint) / sizeof(endpoint[0]))) return true;
+    __atomic_store_n(&g_running, 1, __ATOMIC_RELEASE);
+    g_thread = CreateThread(0, 0, thread_main, 0, 0, &g_thread_id);
+    if (!g_thread) __atomic_store_n(&g_running, 0, __ATOMIC_RELEASE);
+    return g_thread != 0;
 }
 
 static void stop()
 {
     __atomic_store_n(&g_running, 0, __ATOMIC_RELEASE);
     __atomic_add_fetch(&g_udp_session, 1, __ATOMIC_ACQ_REL);
+    // Only the worker closes sockets. Serialize shutdown with its close so a
+    // reused numeric handle can never refer to an unrelated application socket.
+    socket_lock();
+    SOCKET s = __atomic_load_n(&g_socket, __ATOMIC_ACQUIRE);
+    if (s != INVALID_SOCKET) shutdown(s, 2 /* SD_BOTH */);
+    __atomic_store_n(&g_socket_lock, 0, __ATOMIC_RELEASE);
 }
 
 } // namespace ipc
+
+namespace runtime {
+static exl_worker_lifecycle::state lifecycle;
+struct hooks {
+    NF_EventHandler *handler;
+    void pause() { Sleep(0); }
+    bool start() {
+        inject::g_handler = handler;
+        return inject::start(handler) && ipc::start();
+    }
+    void revoke() { inject::stop(); ipc::stop(); }
+    bool on_worker() {
+        DWORD self = GetCurrentThreadId();
+        return (inject::g_thread && inject::g_thread_id == self &&
+                WaitForSingleObject(inject::g_thread, 0) != 0) ||
+               (ipc::g_thread && ipc::g_thread_id == self &&
+                WaitForSingleObject(ipc::g_thread, 0) != 0);
+    }
+    bool finished() {
+        return (!inject::g_thread || WaitForSingleObject(inject::g_thread, 0) == 0) &&
+               (!ipc::g_thread || WaitForSingleObject(ipc::g_thread, 0) == 0);
+    }
+    void join() {
+        if (inject::g_thread) WaitForSingleObject(inject::g_thread, 0xffffffffUL);
+        if (ipc::g_thread) WaitForSingleObject(ipc::g_thread, 0xffffffffUL);
+    }
+    void reap() {
+        if (inject::g_thread) CloseHandle(inject::g_thread);
+        if (ipc::g_thread) CloseHandle(ipc::g_thread);
+        inject::g_thread = ipc::g_thread = 0;
+        inject::g_thread_id = ipc::g_thread_id = 0;
+        inject::g_handler = 0;
+    }
+};
+static bool start(NF_EventHandler *handler) {
+    hooks h = {handler};
+    return exl_worker_lifecycle::start(lifecycle, h);
+}
+static void stop() {
+    hooks h = {0};
+    exl_worker_lifecycle::stop(lifecycle, h);
+}
+} // namespace runtime
 
 #define NFAPI_EXPORT __declspec(dllexport)
 
@@ -2260,16 +2381,15 @@ NFAPI_EXPORT NF_STATUS nf_init(const char *driver_name, NF_EventHandler *handler
         out.text(" handler="); out.text(handler ? "present" : "absent");
     }
     NF_STATUS st = trace::status_for(out, "nf_init");
+    if (st == NF_STATUS_SUCCESS && !runtime::start(handler)) st = NF_STATUS_FAIL;
     trace::result(out, st); trace::finish(out);
-    if (st == NF_STATUS_SUCCESS) { inject::g_handler = handler; inject::start(handler); ipc::start(); }
     return st;
 }
 
 NFAPI_EXPORT void nf_free()
 {
     trace::line out; trace::prefix(out, "nf_free"); trace::finish(out);
-    inject::stop();
-    ipc::stop();
+    runtime::stop();
 }
 
 static NF_STATUS log_udp_post(const char *name, unsigned int api, ENDPOINT_ID id, const unsigned char *remote,

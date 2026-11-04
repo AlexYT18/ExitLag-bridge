@@ -145,6 +145,7 @@ def main():
         checks.run("Native UDP " + name, ["make", "-B", "-C", "backend", target],
                    needs=("make", compiler), reason=loopback_reason if target == "check-udp-attribution" else "")
     checks.run("Shim socket attribution", ["bash", "tests/test-shim-attribution.sh"], needs=("bash", cxx[0] if cxx else "c++"))
+    checks.run("Shim worker lifecycle", ["bash", "tests/test-shim-lifecycle.sh"], needs=("bash", cxx[0] if cxx else "c++"))
     checks.run("Shim PID domains", ["bash", "tests/test-shim-pid-domain.sh"], needs=("bash", cxx[0] if cxx else "c++"))
     checks.run("Authenticated backend IPC", [sys.executable, "tests/test_backend_ipc.py", "-v"], reason=helper_reason, unit_test=True)
     for filename in ("test-identity-map.sh", "rpc-surface-test.sh", "identity-assistant-test.sh"):
@@ -184,6 +185,7 @@ def main():
                        "CFLAGS=" + flags, "LDFLAGS=" + links], needs=("make", compiler), env=sanitizer_env,
                        reason=loopback_reason if target == "check-udp-attribution" else "")
         checks.run("ASan UBSan shim socket attribution", ["bash", "tests/test-shim-attribution.sh", "--sanitize"], needs=("bash", cxx[0] if cxx else "c++"), env=sanitizer_env)
+        checks.run("ASan UBSan shim worker lifecycle", ["bash", "tests/test-shim-lifecycle.sh", "--sanitize"], needs=("bash", cxx[0] if cxx else "c++"), env=sanitizer_env)
         checks.run("ASan UBSan shim PID domains", ["bash", "tests/test-shim-pid-domain.sh", "--sanitize"], needs=("bash", cxx[0] if cxx else "c++"), env=sanitizer_env)
         sanitized = checks.run("ASan UBSan fresh backend", ["make", "-B", "-C", "backend", "CFLAGS=" + flags, "LDFLAGS=" + links], needs=("make", compiler), env=sanitizer_env)
         checks.run("ASan UBSan authenticated backend IPC", [sys.executable, "tests/test_backend_ipc.py", "-v"], env=sanitizer_env,

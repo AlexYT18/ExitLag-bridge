@@ -27,3 +27,4 @@ EXPORTS
     CreateThread
     MoveFileExW
     GetFileSizeEx
+    WaitForSingleObject

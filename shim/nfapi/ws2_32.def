@@ -7,3 +7,9 @@ EXPORTS
     recv
     closesocket
     setsockopt
+    shutdown
+    WSACleanup
+    WSAGetLastError
+    ioctlsocket
+    getsockopt
+    select
