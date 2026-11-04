@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT / 'installers/linux'))
 from bridge_setup.process_picker import Candidate, ImageCandidate, PickerError
 from game_picker import MappingEditor
 import game_picker
+import app as desktop_app
 from run_root import read_map
 
 
@@ -258,6 +259,53 @@ class RealTkPicker(unittest.TestCase):
         dialog.refresh()
         self.pump(lambda: not dialog.refresh_button.instate(['disabled']))
         self.assertEqual(len(dialog.process_tree.get_children()), 1)
+
+    def test_dashboard_uses_selected_game_and_explicit_udp_without_verified_relay(self):
+        import tkinter as tk
+        self.editor.close()
+        desktop = desktop_app.Desktop.__new__(desktop_app.Desktop)
+        desktop.window = tk.Toplevel(self.root)
+        desktop.window.geometry('1000x660')
+        self.addCleanup(desktop.window.destroy)
+        desktop.state = self.directory
+        desktop.busy = False; desktop.helper = desktop.client = None
+        desktop.message = tk.StringVar(value='Synthetic dashboard test; no client or relay is running.')
+        desktop.udp_enabled = tk.BooleanVar(value=False)
+        desktop.selected_game = tk.StringVar(value='Choose a game')
+        desktop.selected_details = tk.StringVar()
+        desktop.session_status = tk.StringVar(value='Stopped')
+        desktop.relay_status = tk.StringVar(value='Not verified')
+        desktop.transport_status = tk.StringVar(value='TCP')
+        desktop.mapping_rows = {}
+        desktop._build_ui()
+        with mock.patch.object(desktop, 'configured', return_value=False):
+            desktop.refresh_game_list()
+            self.root.update()
+            self.assertTrue(desktop.pages['games'].winfo_viewable())
+            self.assertTrue(desktop.udp_toggle.instate(['disabled']))
+            self.assertEqual(desktop.relay_status.get(), 'Not verified')
+            desktop.show_page('setup'); self.root.update()
+            self.assertTrue(desktop.pages['setup'].winfo_viewable())
+            self.assertFalse(desktop.pages['games'].winfo_viewable())
+        self.path.write_text(self.picker.mapping(self.picker.candidate, image=self.picker.images[0]) + '\n')
+        self.path.chmod(0o600)
+        with mock.patch.object(desktop, 'configured', return_value=True):
+            desktop.refresh_game_list(); self.root.update()
+            self.assertEqual(desktop.selected_game.get(), 'Synthetic Game.exe')
+            self.assertFalse(desktop.udp_toggle.instate(['disabled']))
+            self.assertNotIn('--udp', desktop._helper_command())
+            desktop.udp_enabled.set(True); desktop._sync_controls()
+            self.assertIn('--udp', desktop._helper_command())
+            self.assertEqual(desktop.session_status.get(), 'Stopped')
+            self.assertEqual(desktop.relay_status.get(), 'Not verified')
+            preview = os.environ.get('EXL_DASHBOARD_PREVIEW')
+            if preview:
+                from PIL import ImageGrab
+                self.root.update()
+                ImageGrab.grab(xdisplay=self.display).save(preview)
+            desktop.helper = mock.Mock(); desktop._sync_controls()
+            self.assertTrue(desktop.udp_toggle.instate(['disabled']))
+            self.assertEqual(desktop.relay_status.get(), 'Not verified')
 
 
 if __name__ == '__main__':

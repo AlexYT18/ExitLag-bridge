@@ -15,7 +15,7 @@ import tarfile
 
 ROOT = Path(__file__).resolve().parents[2]
 VERSION = '0.4.0'
-FILES = ('backend/exitlag-netd', 'backend/run-tcp-redirect.sh', 'backend/runtime-guard.sh',
+FILES = ('backend/exitlag-netd', 'backend/run-tcp-redirect.sh', 'backend/run-udp-multi.sh', 'backend/runtime-guard.sh',
          'backend/nft-setup.sh', 'backend/nft-teardown.sh', 'installers/linux/app.py',
          'installers/linux/run_root.py', 'installers/linux/game_picker.py',
          'tools/discover-game-processes.py', 'installers/setup.py', 'LICENSE', 'THIRD_PARTY.md',

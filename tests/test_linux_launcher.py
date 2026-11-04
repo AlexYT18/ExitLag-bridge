@@ -86,6 +86,66 @@ class DesktopLifecycle(unittest.TestCase):
             self.desktop.close()
         self.desktop.window.destroy.assert_called_once_with()
 
+    def test_udp_is_an_explicit_supervisor_flag_and_defaults_off(self):
+        command = self.desktop._helper_command()
+        self.assertNotIn('--udp', command)
+        self.desktop.udp_enabled = mock.Mock(get=mock.Mock(return_value=False))
+        self.assertEqual(self.desktop._helper_command(), command)
+        self.desktop.udp_enabled.get.return_value = True
+        self.assertEqual(self.desktop._helper_command(), command + ['--udp'])
+        self.assertEqual(command[0:3], ['pkexec', '/usr/bin/python3', '-I'])
+        self.assertEqual(command[command.index('--map') + 1], str(self.desktop.state / 'games.map'))
+
+    def controls(self, running=False, configured=True, mappings=True):
+        for name in ('launch_button', 'stop_button', 'manage_button', 'udp_toggle',
+                     'transport_status', 'session_status', 'relay_status'):
+            setattr(self.desktop, name, mock.Mock())
+        self.desktop.busy = False
+        self.desktop.helper = mock.Mock() if running else None
+        self.desktop.client = None
+        self.desktop.configured = mock.Mock(return_value=configured)
+        self.desktop.mapping_rows = {'game': 'entry'} if mappings else {}
+        self.desktop.udp_enabled = mock.Mock(get=mock.Mock(return_value=False))
+
+    def test_udp_control_is_locked_during_authorization_and_running_session(self):
+        self.controls(running=True)
+        self.desktop._sync_controls()
+        self.desktop.udp_toggle.state.assert_called_with(['disabled'])
+        self.desktop.launch_button.state.assert_called_with(['disabled'])
+        self.desktop.stop_button.state.assert_called_with(['!disabled'])
+        self.desktop.relay_status.set.assert_called_with('Not verified')
+        self.desktop.session_status.set.assert_called_with('Authorizing / starting')
+        self.desktop.client = mock.Mock()
+        self.desktop._sync_controls()
+        self.desktop.session_status.set.assert_called_with('Client started; route not verified')
+        self.desktop.relay_status.set.assert_called_with('Not verified')
+
+    def test_udp_control_requires_completed_setup_and_saved_games(self):
+        for configured, mappings, ready in ((False, False, False), (False, True, False),
+                                            (True, False, False), (True, True, True)):
+            with self.subTest(configured=configured, mappings=mappings):
+                self.controls(configured=configured, mappings=mappings)
+                self.desktop._sync_controls()
+                self.desktop.udp_toggle.state.assert_called_with(['!disabled'] if ready else ['disabled'])
+
+    def test_stopping_routing_closes_existing_session_and_keeps_dashboard_visible(self):
+        self.desktop.busy = False
+        self.desktop.window = mock.Mock()
+        with mock.patch.object(self.desktop, 'stop_session') as stop:
+            self.desktop.stop_routing()
+        stop.assert_called_once_with()
+        self.desktop.window.deiconify.assert_called_once_with()
+        self.desktop.window.destroy.assert_not_called()
+        self.desktop.message.set.assert_called_with('Routing stopped. Reconnect existing game sessions before testing a different mode.')
+
+    def test_setup_in_progress_does_not_allow_session_stop_button(self):
+        self.desktop.busy = True
+        self.desktop.window = mock.Mock()
+        with mock.patch.object(self.desktop, 'stop_session') as stop:
+            self.desktop.stop_routing()
+        stop.assert_not_called()
+        self.desktop.window.deiconify.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

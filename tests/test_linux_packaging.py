@@ -77,6 +77,7 @@ class LinuxPackaging(unittest.TestCase):
         target = self.work / 'program'
         builder.populate(target)
         for name in ('installers/linux/game_picker.py',
+                     'backend/run-udp-multi.sh',
                      'tools/discover-game-processes.py',
                      'installers/bridge_setup/process_picker.py',
                      'installers/bridge_setup/core.py',
@@ -113,6 +114,7 @@ class LinuxPackaging(unittest.TestCase):
             members = {member.name: member for member in archive.getmembers()}
             top = f'exitlag-bridge-{builder.VERSION}-linux-x86_64'
             for name in ('install.sh', 'uninstall.sh', 'exitlag-bridge.desktop',
+                         'program/backend/run-udp-multi.sh',
                          'program/installers/linux/game_picker.py',
                          'program/installers/bridge_setup/process_picker.py',
                          'program/tools/discover-game-processes.py'):

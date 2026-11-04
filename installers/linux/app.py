@@ -35,7 +35,8 @@ class Desktop:
         self.state = default_state()
         self.window = tk.Tk()
         self.window.title('ExitLag Bridge')
-        self.window.geometry('570x400')
+        self.window.geometry('1000x660')
+        self.window.minsize(820, 570)
         self.window.protocol('WM_DELETE_WINDOW', self.close)
         signal.signal(signal.SIGTERM, lambda *_: self.window.after(0, self.close))
         self.events = queue.Queue()
@@ -46,24 +47,124 @@ class Desktop:
         self.last_check = 0
         self.checking = False
         self.message = tk.StringVar(value='Download the official Windows installer, then choose its .exe.')
-        box = ttk.Frame(self.window, padding=24); box.pack(fill='both', expand=True)
-        ttk.Label(box, text='ExitLag Bridge', font=('', 20, 'bold')).pack(anchor='w')
-        ttk.Label(box, text='Unofficial Linux compatibility launcher').pack(anchor='w', pady=(0, 16))
-        ttk.Label(box, textvariable=self.message, wraplength=510).pack(anchor='w', pady=8)
-        ttk.Label(box, text='Review the vendor terms in its wizard. Leave Launch ExitLag unchecked.\nYour account stays in your own private installation.', wraplength=510).pack(anchor='w', pady=8)
-        ttk.Label(box, text='If the wizard warns that its Windows NDIS driver could not install, click OK to continue. The bridge supplies native routing instead.', wraplength=510).pack(anchor='w', pady=8)
-        buttons = ttk.Frame(box); buttons.pack(anchor='w', pady=10)
-        ttk.Button(buttons, text='Download from ExitLag', command=lambda: webbrowser.open('https://www.exitlag.com/download')).pack(side='left', padx=(0, 8))
-        self.choose = ttk.Button(buttons, text='Choose installer…', command=self.install); self.choose.pack(side='left')
-        bottom = ttk.Frame(box); bottom.pack(anchor='w', pady=8)
-        ttk.Button(bottom, text='Configure games…', command=self.games).pack(side='left', padx=(0, 8))
-        ttk.Button(bottom, text='Launch ExitLag', command=self.launch).pack(side='left', padx=(0, 8))
-        ttk.Button(bottom, text='Quit', command=self.close).pack(side='left')
+        self.udp_enabled = tk.BooleanVar(value=False)
+        self.selected_game = tk.StringVar(value='Choose a game')
+        self.selected_details = tk.StringVar(value='Add a running game to capture its executable and Wine/Proton prefix.')
+        self.session_status = tk.StringVar(value='Stopped')
+        self.relay_status = tk.StringVar(value='Not verified')
+        self.transport_status = tk.StringVar(value='TCP')
+        self.mapping_rows = {}
+        self._build_ui()
+        self.refresh_game_list()
         self.window.after(300, self.poll)
         if manage:
             self.window.after(100, self.games)
         elif self.configured():
-            self.window.after(100, self.launch)
+            self.message.set('Ready. Choose a game, then launch ExitLag and apply its route in the official client.')
+
+    def _build_ui(self):
+        shell = ttk.Frame(self.window); shell.pack(fill='both', expand=True)
+        sidebar = ttk.Frame(shell, padding=18); sidebar.pack(side='left', fill='y')
+        sidebar.configure(width=245)
+        ttk.Label(sidebar, text='ExitLag Bridge', font=('', 18, 'bold')).pack(anchor='w')
+        ttk.Label(sidebar, text='Linux compatibility layer').pack(anchor='w', pady=(4, 22))
+        ttk.Label(sidebar, text='MY GAMES', font=('', 10, 'bold')).pack(anchor='w')
+        self.game_list = ttk.Treeview(sidebar, show='tree', selectmode='browse', height=14)
+        self.game_list.column('#0', width=205, minwidth=150)
+        self.game_list.pack(fill='both', expand=True, pady=8)
+        self.game_list.bind('<<TreeviewSelect>>', self.select_game)
+        self.manage_button = ttk.Button(sidebar, text='Add / manage games', command=self.games)
+        self.manage_button.pack(fill='x', pady=(4, 6))
+        ttk.Button(sidebar, text='Refresh games', command=self.refresh_game_list).pack(fill='x', pady=(0, 16))
+        ttk.Button(sidebar, text='Client setup', command=lambda: self.show_page('setup')).pack(fill='x', pady=(0, 6))
+        ttk.Button(sidebar, text='Game dashboard', command=lambda: self.show_page('games')).pack(fill='x')
+        ttk.Button(sidebar, text='Quit', command=self.close).pack(fill='x', pady=(16, 0))
+        ttk.Separator(shell, orient='vertical').pack(side='left', fill='y')
+        content = ttk.Frame(shell, padding=24); content.pack(side='left', fill='both', expand=True)
+        self.pages = {name: ttk.Frame(content) for name in ('games', 'setup')}
+        game = self.pages['games']
+        ttk.Label(game, textvariable=self.selected_game, font=('', 24, 'bold')).pack(anchor='w')
+        ttk.Label(game, textvariable=self.selected_details, wraplength=640).pack(anchor='w', pady=(10, 24))
+        session = ttk.LabelFrame(game, text='Session', padding=16); session.pack(fill='x')
+        for row, (label, value) in enumerate((('Helper / client', self.session_status), ('Traffic mode', self.transport_status), ('Relay traffic', self.relay_status))):
+            ttk.Label(session, text=label).grid(row=row, column=0, sticky='w', padx=(0, 28), pady=5)
+            ttk.Label(session, textvariable=value).grid(row=row, column=1, sticky='w', pady=5)
+        self.udp_toggle = ttk.Checkbutton(game, text='Experimental UDP', variable=self.udp_enabled, command=self._sync_controls)
+        self.udp_toggle.pack(anchor='w', pady=(20, 6))
+        ttk.Label(game, text='UDP must be verified for each game. A detected process does not prove relay traffic or successful gameplay.', wraplength=640).pack(anchor='w')
+        ttk.Label(game, text='Authentication, relay selection and route decisions remain in the official ExitLag client.', wraplength=640).pack(anchor='w', pady=(12, 20))
+        ttk.Label(game, text='All saved mappings apply to this session. Choose active game routes in ExitLag.', wraplength=640).pack(anchor='w', pady=(0, 12))
+        actions = ttk.Frame(game); actions.pack(fill='x')
+        self.launch_button = ttk.Button(actions, text='Launch ExitLag', command=self.launch); self.launch_button.pack(side='left')
+        self.stop_button = ttk.Button(actions, text='Stop routing', command=self.stop_routing); self.stop_button.pack(side='left', padx=10)
+        ttk.Label(game, textvariable=self.message, wraplength=640).pack(anchor='w', pady=(20, 0))
+        setup = self.pages['setup']
+        ttk.Label(setup, text='Official client setup', font=('', 22, 'bold')).pack(anchor='w')
+        ttk.Label(setup, text='Download the original ExitLag Windows installer, then choose its .exe. Sign in inside the official client using your own account.', wraplength=640).pack(anchor='w', pady=(16, 20))
+        buttons = ttk.Frame(setup); buttons.pack(anchor='w')
+        ttk.Button(buttons, text='Download from ExitLag', command=lambda: webbrowser.open('https://www.exitlag.com/download')).pack(side='left', padx=(0, 8))
+        self.choose = ttk.Button(buttons, text='Choose installer...', command=self.install); self.choose.pack(side='left')
+        ttk.Label(setup, text='Review the vendor terms. Use C:\\ExitLag and leave Launch ExitLag unchecked in the installer.', wraplength=640).pack(anchor='w', pady=(24, 12))
+        ttk.Label(setup, text='The documented Windows NDIS warning can be acknowledged because this bridge supplies native routing. Other setup failures must be investigated.', wraplength=640).pack(anchor='w')
+        ttk.Label(setup, textvariable=self.message, wraplength=640).pack(anchor='w', pady=(24, 0))
+        self.show_page('games')
+
+    def show_page(self, name):
+        for page in self.pages.values(): page.pack_forget()
+        self.pages[name].pack(fill='both', expand=True)
+
+    def refresh_game_list(self):
+        sys.path.insert(0, str(Path(__file__).parent))
+        from game_picker import MappingController, load_map
+        previous = self.game_list.selection()
+        try:
+            rows = MappingController(load_map(self.state / 'games.map')).rows()
+        except (OSError, ValueError) as error:
+            self.message.set('Game settings: ' + str(error)); rows = []
+        self.game_list.delete(*self.game_list.get_children())
+        self.mapping_rows = {str(row[0]): row for row in rows}
+        for key, row in self.mapping_rows.items():
+            self.game_list.insert('', 'end', iid=key, text=row[1])
+        choice = previous[0] if previous and previous[0] in self.mapping_rows else next(iter(self.mapping_rows), None)
+        if choice is not None:
+            self.game_list.selection_set(choice)
+            self.select_game()
+        else:
+            self.selected_game.set('Choose a game')
+            self.selected_details.set('Add a running game to capture its executable and Wine/Proton prefix.')
+        self._sync_controls()
+
+    def select_game(self, _event=None):
+        selected = self.game_list.selection()
+        if not selected or selected[0] not in self.mapping_rows: return
+        _index, name, kind, identity, _source = self.mapping_rows[selected[0]]
+        self.selected_game.set(name)
+        self.selected_details.set(f'{kind}\nWindows identity: {identity}')
+        self.show_page('games')
+
+    def _sync_controls(self):
+        if not hasattr(self, 'launch_button'): return
+        running = bool(self.helper or self.client)
+        self.launch_button.state(['disabled'] if self.busy or running else ['!disabled'])
+        self.stop_button.state(['!disabled'] if running and not self.busy else ['disabled'])
+        self.manage_button.state(['disabled'] if self.busy or running else ['!disabled'])
+        ready = not self.busy and not running and self.configured() and bool(self.mapping_rows)
+        self.udp_toggle.state(['!disabled'] if ready else ['disabled'])
+        self.transport_status.set('TCP + UDP (experimental)' if self.udp_enabled.get() else 'TCP')
+        self.session_status.set('Client started; route not verified' if self.client else 'Authorizing / starting' if self.helper else 'Stopped')
+        self.relay_status.set('Not verified')
+
+    def _helper_command(self):
+        command = ['pkexec', '/usr/bin/python3', '-I', str(ROOT / 'installers/linux/run_root.py'), '--uid', str(os.getuid()), '--parent', str(os.getpid()), '--map', str(self.state / 'games.map'), '--lease', str(self.state / 'desktop.lease')]
+        option = getattr(self, 'udp_enabled', None)
+        if option is not None and option.get(): command.append('--udp')
+        return command
+
+    def stop_routing(self):
+        if self.busy: return
+        self.stop_session()
+        self.message.set('Routing stopped. Reconnect existing game sessions before testing a different mode.')
+        self.window.deiconify()
 
     def configured(self):
         try:
@@ -97,7 +198,9 @@ class Desktop:
         sys.path.insert(0, str(Path(__file__).parent))
         from game_picker import open_editor
         try:
-            return open_editor(self.window, self.state / 'games.map', ROOT)
+            editor = open_editor(self.window, self.state / 'games.map', ROOT)
+            editor.window.bind('<Destroy>', lambda event: self.window.after_idle(self.refresh_game_list) if event.widget is editor.window and self.window.winfo_exists() else None, add='+')
+            return editor
         except (OSError, ValueError) as error:
             messagebox.showerror('Game settings', str(error), parent=self.window)
 
@@ -118,8 +221,9 @@ class Desktop:
         leasefd = os.open(self.state / 'desktop.lease', os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
         with os.fdopen(leasefd, 'w') as output: output.write('run\n')
         self.started = time.time()
-        self.helper = subprocess.Popen(['pkexec', '/usr/bin/python3', '-I', str(ROOT / 'installers/linux/run_root.py'), '--uid', str(os.getuid()), '--parent', str(os.getpid()), '--map', str(self.state / 'games.map'), '--lease', str(self.state / 'desktop.lease')], stdin=subprocess.DEVNULL)
+        self.helper = subprocess.Popen(self._helper_command(), stdin=subprocess.DEVNULL)
         self.message.set('Authorize routing in the system dialog. ExitLag will open when the helper is ready.')
+        self._sync_controls()
 
     def poll(self):
         try:
@@ -152,14 +256,14 @@ class Desktop:
                     logfd = os.open(self.state / 'client.log', os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
                     with os.fdopen(logfd, 'ab') as log:
                         self.client = subprocess.Popen([str(self.state / 'runtime/bin/wine'), str(client)], cwd=client.parent, env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log)
-                    self.message.set('Routing is active. Select your game and apply its routes in ExitLag.')
-                    self.window.withdraw()
+                    self.message.set('Helper ready and official client started. Select your game and apply its routes in ExitLag; relay traffic is not yet verified.')
                 elif time.time() - self.started > 120:
                     self.message.set('The routing helper did not start. Close and try again.')
                     self.stop_session()
             elif time.time() - self.started > 25 and time.time() - self.last_check > 5 and not self.checking:
                 self.last_check = time.time(); self.checking = True
                 threading.Thread(target=self.check_client, daemon=True).start()
+        self._sync_controls()
         self.window.after(500, self.poll)
 
     def check_client(self):
@@ -187,6 +291,7 @@ class Desktop:
             self.helper = None
             if self.lock is not None:
                 os.close(self.lock); self.lock = None
+            self._sync_controls()
 
     def close(self):
         if self.busy:

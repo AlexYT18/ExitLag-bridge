@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Account-free Linux supervisor and package-boundary checks."""
 import importlib.util
+import contextlib
+import io
 import os
 from pathlib import Path
 import stat
+import subprocess
 import sys
 import tempfile
 import time
@@ -123,6 +126,73 @@ class Supervisor(unittest.TestCase):
         with mock.patch.object(sys, 'argv', args), mock.patch.object(os, 'geteuid', return_value=0):
             with self.assertRaisesRegex(SystemExit, 'installed'):
                 module.main()
+
+    def test_udp_is_explicit_boolean_cli_mode_and_defaults_to_tcp(self):
+        common = ['--uid', '1000', '--parent', '1234', '--map', '/private/games.map',
+                  '--lease', '/private/desktop.lease']
+        self.assertFalse(module.parse_args(common).udp)
+        self.assertTrue(module.parse_args(common + ['--udp']).udp)
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as raised:
+            module.parse_args(common + ['--udp=run-arbitrary-command'])
+        self.assertEqual(raised.exception.code, 2)
+
+    def test_fixed_installed_command_preserves_tcp_default_and_selects_udp_runner(self):
+        for root in module.ROOTS:
+            self.assertEqual(module.runner_command(root),
+                             ['/bin/bash', str(root / 'backend/run-tcp-redirect.sh')])
+            self.assertEqual(module.runner_command(root, True),
+                             ['/bin/bash', str(root / 'backend/run-udp-multi.sh')])
+        for root, mode in (('/tmp/untrusted', False), ('relative', True),
+                           (module.ROOTS[0], 'run-udp-multi.sh; command')):
+            with self.subTest(root=str(root), mode=mode), self.assertRaises(ValueError):
+                module.runner_command(root, mode)
+
+    def test_supervisor_environment_is_scoped_and_does_not_inherit_routing_overrides(self):
+        malicious = {'PATH': '/untrusted', 'UDP_TEST_PORT': '9',
+                     'UDP_TEST_EXE': 'unrelated.exe', 'QUEUE_NUM': '999',
+                     'LD_PRELOAD': '/untrusted.so', 'ENABLE_UDP_MULTI': '1',
+                     'ALLOW_REMOTE_REDIRECT': '1', 'EXITLAG_IDENTITY_MAP': '/wrong.map'}
+        with mock.patch.dict(os.environ, malicious):
+            tcp = module.runner_environment(1000, 1001, '/run/checked.map', '/run/checked.log')
+            udp = module.runner_environment(1000, 1001, '/run/checked.map', '/run/checked.log', True)
+        self.assertNotIn('UDP_TEST_DEST', tcp)
+        self.assertNotIn('ENABLE_UDP_MULTI', tcp)
+        self.assertEqual(udp, dict(tcp, UDP_TEST_DEST='any', ENABLE_UDP_OBSERVE='1',
+                                  ENABLE_UDP_STEER='1', ENABLE_UDP_MULTI='1'))
+        for env in (tcp, udp):
+            self.assertEqual(env['EXL_USER_UID'], '1000')
+            self.assertEqual(env['SUDO_GID'], '1001')
+            self.assertEqual(env['EXITLAG_IDENTITY_MAP'], '/run/checked.map')
+            self.assertEqual(env['NETD_LOG'], '/run/checked.log')
+            self.assertEqual(env['PATH'], '/usr/sbin:/usr/bin:/sbin:/bin')
+            for name in ('UDP_TEST_PORT', 'UDP_TEST_EXE', 'QUEUE_NUM', 'LD_PRELOAD',
+                         'ALLOW_REMOTE_REDIRECT'):
+                self.assertNotIn(name, env)
+
+    def test_invalid_authorization_metadata_is_rejected_before_spawning(self):
+        for uid, gid, mode in ((0, 0, True), (999, 1000, False),
+                               (1000, -1, True), ('1000', 1000, False),
+                               (1000, 1000, 'yes')):
+            with self.subTest(uid=uid, gid=gid, mode=mode), self.assertRaises(ValueError):
+                module.runner_environment(uid, gid, '/run/map', '/run/log', mode)
+
+    @unittest.skipIf(os.geteuid() == 0, 'requires an ordinary unprivileged user')
+    def test_udp_runner_refuses_unprivileged_start_before_firewall_commands(self):
+        commands = Path(self.temporary.name) / 'commands'
+        commands.mkdir()
+        marker = Path(self.temporary.name) / 'firewall-used'
+        nft = commands / 'nft'
+        nft.write_text('#!/bin/sh\nprintf used > "$FIREWALL_CANARY"\n')
+        nft.chmod(0o700)
+        env = dict(os.environ, PATH=str(commands) + os.pathsep + os.environ.get('PATH', ''),
+                   FIREWALL_CANARY=str(marker), TEST_DEST='any', UDP_TEST_DEST='any',
+                   EXL_USER_UID=str(os.getuid()), EXITLAG_IDENTITY_MAP=str(self.path),
+                   ENABLE_REDIRECT='1', ENABLE_UDP_STEER='1', ENABLE_UDP_MULTI='1')
+        result = subprocess.run(['bash', str(ROOT / 'backend/run-udp-multi.sh')],
+                                env=env, text=True, capture_output=True, timeout=5)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn('run with sudo', result.stderr)
+        self.assertFalse(marker.exists(), 'unprivileged launch must not invoke nft')
 
 
 if __name__ == '__main__': unittest.main(verbosity=2)
