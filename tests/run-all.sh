@@ -90,6 +90,9 @@ if [[ "$tier" == unit || "$tier" == system || "$tier" == live || "$tier" == all 
     run_test "TCP socket attribution" none make -B -C "$repo_root/backend" check-tcp-attribution
     run_test "process birth identity" none make -B -C "$repo_root/backend" check-process-identity
     run_test "NFQUEUE verdict encoding" none make -B -C "$repo_root/backend" check-nfq-verdict
+    run_test "UDP socket attribution" none make -B -C "$repo_root/backend" check-udp-attribution
+    run_test "UDP packet codec" none make -B -C "$repo_root/backend" check-udp-packet
+    run_test "UDP peer lifecycle" none make -B -C "$repo_root/backend" check-udp-peers
     run_test "shim socket attribution" none bash "$repo_root/tests/test-shim-attribution.sh"
     run_test "shim PID domains"       none bash "$repo_root/tests/test-shim-pid-domain.sh"
     run_test "nfapi ABI matches ExitLag" installed "$repo_root/tools/check-exitlag-abi.sh"

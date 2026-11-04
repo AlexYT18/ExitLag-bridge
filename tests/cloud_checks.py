@@ -140,6 +140,10 @@ def main():
     helper_reason = "fresh backend build did not pass" if helper != "PASS" else loopback_reason
     checks.run("Native TCP attribution", ["make", "-B", "-C", "backend", "check-tcp-attribution"], needs=("make", compiler), reason=loopback_reason)
     checks.run("Native process identity", ["make", "-B", "-C", "backend", "check-process-identity"], needs=("make", compiler), reason=loopback_reason)
+    for target, name in (("check-udp-attribution", "attribution"),
+                         ("check-udp-packet", "packet codec"), ("check-udp-peers", "peer lifecycle")):
+        checks.run("Native UDP " + name, ["make", "-B", "-C", "backend", target],
+                   needs=("make", compiler), reason=loopback_reason if target == "check-udp-attribution" else "")
     checks.run("Shim socket attribution", ["bash", "tests/test-shim-attribution.sh"], needs=("bash", cxx[0] if cxx else "c++"))
     checks.run("Shim PID domains", ["bash", "tests/test-shim-pid-domain.sh"], needs=("bash", cxx[0] if cxx else "c++"))
     checks.run("Authenticated backend IPC", [sys.executable, "tests/test_backend_ipc.py", "-v"], reason=helper_reason, unit_test=True)
@@ -156,10 +160,11 @@ def main():
     checks.run("Cppcheck native backend", ["cppcheck", "--check-level=exhaustive",
                "--enable=warning,performance,portability", "--error-exitcode=1", "--std=c11",
                "--suppress=missingIncludeSystem", "backend/exitlag-netd.c", "backend/ipc_transport.c",
-               "backend/tcp_attribution.c", "backend/process_identity.c", "backend/nfq_verdict.c"], needs=("cppcheck",))
+               "backend/tcp_attribution.c", "backend/process_identity.c", "backend/nfq_verdict.c",
+               "backend/udp_attribution.c", "backend/udp_packet.c", "backend/udp_peers.c"], needs=("cppcheck",))
     if shutil.which(compiler) and Path(compiler).name in ("gcc", "cc"):
         checks.run("GCC static analyzer IPC", [*cc, "-Wall", "-Wextra", "-Werror", "-fanalyzer", "-c", "backend/ipc_transport.c", "-o", str(checks.output / "ipc-analyzer.o")])
-        for module in ("tcp_attribution", "process_identity", "nfq_verdict"):
+        for module in ("tcp_attribution", "process_identity", "nfq_verdict", "udp_attribution", "udp_packet", "udp_peers"):
             checks.run("GCC static analyzer " + module, [*cc, "-Wall", "-Wextra", "-Werror", "-fanalyzer", "-c", "backend/" + module + ".c", "-o", str(checks.output / (module + "-analyzer.o"))])
     else:
         checks.record("GCC static analyzer IPC", "SKIP", "requires GCC -fanalyzer")
@@ -173,6 +178,11 @@ def main():
         checks.run("ASan UBSan shim IPC validation", ["bash", "tests/test-shim-validation.sh", "--sanitize"], needs=("bash", cxx[0] if cxx else "c++"), env=sanitizer_env)
         for target, name in (("check-tcp-attribution", "TCP attribution"), ("check-process-identity", "process identity")):
             checks.run("ASan UBSan native " + name, ["make", "-B", "-C", "backend", target, "CFLAGS=" + flags, "LDFLAGS=" + links], needs=("make", compiler), env=sanitizer_env, reason=loopback_reason)
+        for target, name in (("check-udp-attribution", "UDP attribution"), ("check-udp-packet", "UDP packet codec"),
+                             ("check-udp-peers", "UDP peer lifecycle")):
+            checks.run("ASan UBSan native " + name, ["make", "-B", "-C", "backend", target,
+                       "CFLAGS=" + flags, "LDFLAGS=" + links], needs=("make", compiler), env=sanitizer_env,
+                       reason=loopback_reason if target == "check-udp-attribution" else "")
         checks.run("ASan UBSan shim socket attribution", ["bash", "tests/test-shim-attribution.sh", "--sanitize"], needs=("bash", cxx[0] if cxx else "c++"), env=sanitizer_env)
         checks.run("ASan UBSan shim PID domains", ["bash", "tests/test-shim-pid-domain.sh", "--sanitize"], needs=("bash", cxx[0] if cxx else "c++"), env=sanitizer_env)
         sanitized = checks.run("ASan UBSan fresh backend", ["make", "-B", "-C", "backend", "CFLAGS=" + flags, "LDFLAGS=" + links], needs=("make", compiler), env=sanitizer_env)
