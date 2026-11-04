@@ -1,6 +1,7 @@
 // No Wine, account, sockets or Windows headers: test the production decoder
 // against manually encoded Windows MIB table bytes, including on native LP64.
 #include "../shim/nfapi/socket_attribution.h"
+#include "../shim/nfapi/udp_validation.h"
 
 #include <array>
 #include <cstdio>
@@ -270,7 +271,7 @@ static void tcp_tuple_tests(unsigned int family)
             "unused MIB port DWORD upper bits changed port identity");
 }
 
-static void udp_bounds_and_compatibility(unsigned int family)
+static void udp_bounds_and_ownership(unsigned int family)
 {
     Endpoint local = family == 2 ? endpoint4(10, 5353) : endpoint6(10, 5353, 7);
     Endpoint wildcard = local;
@@ -281,12 +282,16 @@ static void udp_bounds_and_compatibility(unsigned int family)
     Bytes exact = table({row(local, 123)});
     require(udp_owner(exact, local, family) == 123, "exact UDP local endpoint lost owner");
     require(udp_owner(table({row(wildcard, 10), row(local, 20), row(local, 30)}),
-                      local, family) == 20, "UDP first exact-match behavior changed");
+                      local, family) == 0, "UDP conflicting exact/wildcard owners accepted");
     require(udp_owner(table({row(wildcard, 10), row(wildcard, 30)}),
-                      local, family) == 30, "UDP last-wildcard behavior changed");
+                      local, family) == 0, "UDP conflicting wildcard owners accepted");
+    require(udp_owner(table({row(wildcard, 10), row(local, 10)}), local, family) == 10,
+            "UDP same-owner exact/wildcard duplicate became ambiguous");
+    require(udp_owner(table({row(local, 10), row(wildcard, 30)}), local, family) == 0,
+            "UDP ambiguity depended on exact row being first");
     Endpoint zero_port = local; zero_port[2] = zero_port[3] = 0;
-    require(udp_owner(table({row(zero_port, 41)}), zero_port, family) == 41,
-            "UDP zero-port lookup behavior changed beyond bounds-only fix");
+    require(udp_owner(table({row(zero_port, 41)}), zero_port, family) == 0,
+            "UDP zero-port lookup accepted");
     Endpoint another = local; another[family == 2 ? 7 : 23] ^= 1;
     require(udp_owner(table({row(another, 99)}), local, family) == 0,
             "UDP wrong local address matched");
@@ -295,8 +300,15 @@ static void udp_bounds_and_compatibility(unsigned int family)
             "UDP wrong local port matched");
     if (family == 23) {
         another = local; another[24] ^= 1;
-        require(udp_owner(table({row(another, 99)}), local, family) == 99,
-                "UDP scope behavior broadened beyond existing address/port lookup");
+        require(udp_owner(table({row(another, 99)}), local, family) == 0,
+                "UDP scope was ignored");
+        Endpoint any_scope = wildcard;
+        put32(any_scope.data() + 24, 0);
+        require(udp_owner(table({row(any_scope, 99)}), local, family) == 99,
+                "UDP unscoped ANY bind did not match scoped local endpoint");
+        put32(any_scope.data() + 24, 8);
+        require(udp_owner(table({row(any_scope, 99)}), local, family) == 0,
+                "UDP wrong scoped ANY bind matched");
     }
     for (unsigned int n = 0; n < exact.size(); ++n) {
         Bytes shortened(exact.begin(), exact.begin() + n);
@@ -559,15 +571,228 @@ static void combination_tests()
                   "unknown second owner status accepted");
 }
 
+
+static void udp_result_tests(unsigned int family)
+{
+    Endpoint local = family == 2 ? endpoint4(10, 50000) : endpoint6(10, 50000, 7);
+    Endpoint wildcard = local;
+    std::memset(wildcard.data() + (family == 2 ? 4 : 8), 0, family == 2 ? 4 : 16);
+    auto row = [family](const Endpoint &a, unsigned int pid) {
+        return family == 2 ? udp4(a, pid) : udp6(a, pid);
+    };
+    auto lookup = [family, local](const Bytes &bytes) {
+        return attribution::lookup_udp_owner(bytes.data(), bytes.size(), bytes.size(),
+                                              family, local.data(), local.size());
+    };
+    expect_result(lookup(table({row(local, 701)})), attribution::owner_found, 701,
+                  "UDP exact result lost FOUND status");
+    expect_result(lookup(table({})), attribution::owner_none, 0,
+                  "UDP empty result did not preserve NONE status");
+    expect_result(lookup(table({row(local, 0)})), attribution::owner_invalid, 0,
+                  "UDP PID0 became absence and allowed fallback");
+    for (bool reverse : {false, true}) {
+        Bytes unknown = reverse ? table({row(local, 701), row(local, 0)}) :
+                                  table({row(local, 0), row(local, 701)});
+        expect_result(lookup(unknown), attribution::owner_invalid, 0,
+                      "UDP unknown matching owner was hidden by known row");
+        Bytes clash = reverse ? table({row(local, 701), row(wildcard, 702)}) :
+                                table({row(wildcard, 702), row(local, 701)});
+        expect_result(lookup(clash), attribution::owner_ambiguous, 0,
+                      "UDP compatible owners were not reported ambiguous");
+    }
+    Bytes broken(3, 0);
+    expect_result(lookup(broken), attribution::owner_invalid, 0,
+                  "UDP truncated count did not preserve INVALID status");
+    Bytes valid = table({row(local, 701)});
+    expect_result(attribution::lookup_udp_owner(valid.data(), valid.size() - 1,
+                      valid.size(), family, local.data(), local.size()),
+                  attribution::owner_invalid, 0, "UDP oversized returned size accepted");
+    Endpoint other = local; other[3] ^= 1;
+    expect_result(lookup(table({row(other, 0), row(local, 701)})),
+                  attribution::owner_found, 701, "unrelated UDP PID0 row hid exact owner");
+    Bytes upper_bits = valid;
+    const unsigned int port_offset = family == 2 ? 4 : 20;
+    upper_bits[4 + port_offset + 2] = upper_bits[4 + port_offset + 3] = 0xff;
+    expect_result(lookup(upper_bits), attribution::owner_found, 701,
+                  "unused UDP MIB port DWORD bits changed owner");
+}
+
+static void udp_mapped_tests()
+{
+    Endpoint local = endpoint4(10, 50000), mapped = {{0}};
+    require(attribution::map_ipv4_endpoint(local.data(), local.size(), mapped.data(), mapped.size()),
+            "UDP fixture IPv4 mapping failed");
+    auto lookup = [local](const Bytes &bytes) {
+        return attribution::lookup_udp_mapped_owner(bytes.data(), bytes.size(), bytes.size(),
+                                                     local.data(), local.size());
+    };
+    expect_result(lookup(table({udp6(mapped, 801)})), attribution::owner_found, 801,
+                  "UDP explicit IPv4-mapped owner not found");
+    expect_result(lookup(table({})), attribution::owner_none, 0,
+                  "empty mapped UDP table did not yield NONE");
+    Endpoint any = mapped; std::memset(any.data() + 8, 0, 16);
+    expect_result(lookup(table({udp6(any, 801)})), attribution::owner_ambiguous, 0,
+                  "UDP6 ANY incorrectly proved ownership of an IPv4 packet");
+    expect_result(lookup(table({udp6(mapped, 801), udp6(any, 801)})),
+                  attribution::owner_ambiguous, 0, "UDP6 ANY uncertainty was concealed by exact owner");
+    mapped[24] = 1;
+    expect_result(lookup(table({udp6(mapped, 801)})), attribution::owner_none, 0,
+                  "mapped UDP owner ignored IPv6 scope");
+    Bytes bytes = table({});
+    expect_result(attribution::lookup_udp_mapped_owner(bytes.data(), bytes.size(), bytes.size(),
+                      any.data(), any.size()), attribution::owner_invalid, 0,
+                  "UDP mapped lookup accepted a native IPv6 source");
+}
+
+static void udp_frame_tests()
+{
+    namespace validation = exl_udp_validation;
+    for (unsigned int family : {2u, 23u}) {
+        Endpoint local = family == 2 ? endpoint4(10, 50000) : endpoint6(10, 50000, 7);
+        Endpoint remote = family == 2 ? endpoint4(80, 443) : endpoint6(80, 443, 8);
+        exl_udp_lifecycle_req lifecycle = {};
+        lifecycle.tag = 1; lifecycle.endpoint_id = 2; lifecycle.process_id = 3;
+        lifecycle.ip_family = static_cast<unsigned short>(family);
+        std::memcpy(lifecycle.local_address, local.data(), local.size());
+        require(validation::valid_lifecycle(lifecycle), "valid UDP lifecycle rejected");
+        exl_udp_lifecycle_req invalid_lifecycle = lifecycle;
+        invalid_lifecycle.tag = 0;
+        require(!validation::valid_lifecycle(invalid_lifecycle), "UDP lifecycle tag0 accepted");
+        invalid_lifecycle = lifecycle; invalid_lifecycle.endpoint_id = 0;
+        require(!validation::valid_lifecycle(invalid_lifecycle), "UDP lifecycle endpoint0 accepted");
+        invalid_lifecycle = lifecycle; invalid_lifecycle.process_id = 0;
+        require(!validation::valid_lifecycle(invalid_lifecycle), "UDP lifecycle PID0 accepted");
+        invalid_lifecycle = lifecycle; invalid_lifecycle.ip_family = 0;
+        require(!validation::valid_lifecycle(invalid_lifecycle), "UDP lifecycle invalid family accepted");
+        invalid_lifecycle = lifecycle; invalid_lifecycle.local_address[1] = 1;
+        require(!validation::valid_lifecycle(invalid_lifecycle), "UDP lifecycle conflicting family accepted");
+        invalid_lifecycle = lifecycle;
+        invalid_lifecycle.local_address[2] = invalid_lifecycle.local_address[3] = 0;
+        require(!validation::valid_lifecycle(invalid_lifecycle), "UDP lifecycle port0 accepted");
+
+        exl_udp_connect_req connect = {};
+        connect.tag = lifecycle.tag; connect.endpoint_id = lifecycle.endpoint_id;
+        connect.process_id = lifecycle.process_id; connect.ip_family = lifecycle.ip_family;
+        std::memcpy(connect.local_address, local.data(), local.size());
+        std::memcpy(connect.remote_address, remote.data(), remote.size());
+        require(validation::valid_connect(connect), "valid UDP connect request rejected");
+        exl_udp_connect_req invalid_connect = connect;
+        invalid_connect.remote_address[0] = family == 2 ? 23 : 2;
+        require(!validation::valid_connect(invalid_connect), "cross-family UDP connect accepted");
+        invalid_connect = connect;
+        invalid_connect.remote_address[2] = invalid_connect.remote_address[3] = 0;
+        require(!validation::valid_connect(invalid_connect), "UDP connect remote port0 accepted");
+
+        exl_udp_datagram_req request = {};
+        request.tag = lifecycle.tag; request.endpoint_id = lifecycle.endpoint_id;
+        request.process_id = lifecycle.process_id; request.ip_family = lifecycle.ip_family;
+        request.direction = EXL_DIR_OUT;
+        std::memcpy(request.local_address, local.data(), local.size());
+        std::memcpy(request.remote_address, remote.data(), remote.size());
+        for (unsigned int options : {0u, 1u, 4096u}) {
+            for (unsigned int length : {0u, 1u, 65535u}) {
+                request.options_length = options; request.payload_length = length;
+                const unsigned int frame = static_cast<unsigned int>(sizeof(request)) + options + length;
+                for (unsigned int direction : {EXL_DIR_IN, EXL_DIR_OUT}) {
+                    request.direction = static_cast<unsigned char>(direction);
+                    require(validation::valid_datagram(request, frame), "valid exact UDP frame rejected");
+                    require(!validation::valid_datagram(request, frame + 1), "UDP frame trailing byte accepted");
+                    require(!validation::valid_datagram(request, frame - 1), "UDP frame missing byte accepted");
+                }
+            }
+        }
+        request.options_length = 0; request.payload_length = 0;
+        const unsigned int empty_frame = static_cast<unsigned int>(sizeof(request));
+        for (unsigned int direction : {0u, 3u, 255u}) {
+            request.direction = static_cast<unsigned char>(direction);
+            require(!validation::valid_datagram(request, empty_frame), "invalid UDP direction accepted");
+        }
+        request.direction = EXL_DIR_OUT; request.reserved = 1;
+        require(!validation::valid_datagram(request, empty_frame), "UDP reserved byte accepted");
+        request.reserved = 0; request.options_length = 4097;
+        require(!validation::valid_datagram(request, empty_frame + 4097), "oversized UDP options accepted");
+        request.options_length = 0; request.payload_length = 65536;
+        require(!validation::valid_datagram(request, empty_frame + 65536), "oversized UDP payload accepted");
+        request.payload_length = 0xffffffffu; request.options_length = 0xffffffffu;
+        require(!validation::valid_datagram(request, empty_frame), "wrapped UDP frame lengths accepted");
+        request.payload_length = request.options_length = 0;
+        require(!validation::valid_datagram(request, 0), "short fixed UDP frame accepted");
+        require(!validation::valid_datagram(request, EXL_MAX_PAYLOAD + 1), "oversized fixed UDP frame accepted");
+        request.remote_address[1] = 1;
+        require(!validation::valid_datagram(request, empty_frame), "UDP datagram mixed family accepted");
+
+        require(validation::valid_post_arguments(remote.data(), nullptr, 0, 0),
+                "zero-length NULL-buffer UDP post rejected");
+        require(validation::valid_post_arguments(remote.data(), "x", 65535, 4096),
+                "valid UDP post argument bounds rejected");
+        require(!validation::valid_post_arguments(remote.data(), nullptr, 1, 0),
+                "positive-length NULL-buffer UDP post accepted");
+        require(!validation::valid_post_arguments(remote.data(), "x", -1, 0),
+                "negative UDP payload length accepted");
+        require(!validation::valid_post_arguments(remote.data(), "x", 65536, 0),
+                "oversized UDP post payload accepted");
+        require(!validation::valid_post_arguments(remote.data(), "x", 1, -1),
+                "negative UDP options were coerced to empty options");
+        require(!validation::valid_post_arguments(remote.data(), "x", 1, 4097),
+                "oversized UDP options accepted");
+        require(!validation::valid_post_arguments(nullptr, "x", 1, 0),
+                "NULL UDP remote accepted");
+        Endpoint invalid_remote = remote; invalid_remote[2] = invalid_remote[3] = 0;
+        require(!validation::valid_post_arguments(invalid_remote.data(), "x", 1, 0),
+                "UDP post remote port0 accepted");
+    }
+    require(validation::context_matches(11, 12, 13, 13, 12), "active UDP context rejected");
+    require(!validation::context_matches(0, 12, 13, 13, 12), "UDP context tag0 accepted");
+    require(!validation::context_matches(11, 0, 13, 13, 0), "UDP context endpoint0 accepted");
+    require(!validation::context_matches(11, 12, 0, 0, 12), "UDP context session0 accepted");
+    require(!validation::context_matches(11, 12, 13, 14, 12), "stale UDP session context accepted");
+    require(!validation::context_matches(11, 12, 13, 13, 14), "UDP post stole another endpoint context");
+    require(!validation::context_matches(11, 12, 13, 13, 0), "UDP post endpoint0 accepted");
+}
+
 int main()
 {
+    {
+        Endpoint source = endpoint4(40, 9000), output;
+        std::memset(source.data() + 8, 0xa5, 20);
+        output.fill(0xcc);
+        require(exl_udp_validation::canonical_post_remote(source.data(), 8, output.data(), output.size()),
+                "defined IPv4 sockaddr fields were not sufficient");
+        require(!std::memcmp(output.data(), source.data(), 8), "IPv4 routing fields changed");
+        require(attribution::zero_bytes(output.data() + 8, 20), "IPv4 caller padding leaked into IPC");
+        require(exl_udp_validation::canonical_post_remote(source.data(), source.size(), source.data(), source.size()),
+                "aliased canonical address copy failed");
+        require(attribution::zero_bytes(source.data() + 8, 20), "aliased padding was not zeroed");
+        for (size_t readable = 0; readable < 8; ++readable) {
+            output.fill(0xcc); const Endpoint before = output;
+            require(!exl_udp_validation::canonical_post_remote(source.data(), readable, output.data(), output.size()),
+                    "short IPv4 post remote accepted");
+            require(output == before, "short post remote changed output");
+        }
+        source = endpoint6(40, 9000, 7);
+        require(exl_udp_validation::canonical_post_remote(source.data(), source.size(), output.data(), output.size()),
+                "complete IPv6 post remote rejected");
+        require(output == source, "IPv6 scope or flow metadata was silently changed");
+        const Endpoint before = output;
+        require(!exl_udp_validation::canonical_post_remote(source.data(), 27, output.data(), output.size()),
+                "short IPv6 post remote accepted");
+        require(output == before, "short IPv6 post remote changed output");
+        require(!exl_udp_validation::canonical_post_remote(source.data(), source.size(), output.data(), 27),
+                "short output post remote accepted");
+        require(!exl_udp_validation::canonical_post_remote(nullptr, 28, output.data(), output.size()),
+                "null post remote accepted");
+    }
     tcp_tuple_tests(2);
     tcp_tuple_tests(23);
-    udp_bounds_and_compatibility(2);
-    udp_bounds_and_compatibility(23);
+    udp_bounds_and_ownership(2);
+    udp_bounds_and_ownership(23);
     tcp_result_tests(2);
     tcp_result_tests(23);
     mapped_endpoint_tests();
     combination_tests();
+    udp_result_tests(2);
+    udp_result_tests(23);
+    udp_mapped_tests();
+    udp_frame_tests();
     std::printf("PASS: shim socket attribution (%u assertions)\n", checks);
 }

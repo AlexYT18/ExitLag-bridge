@@ -242,30 +242,64 @@ static inline owner_result combine_tcp_owners(owner_result first, owner_result s
     return result(owner_none);
 }
 
-// UDP has no remote tuple. This extraction adds bounds checks only: preserve
-// first exact-local match, otherwise last ANY-bound match on the same port.
-// Its ambiguity and IPv6-scope policy are intentionally unchanged and unverified;
-// these results do not establish generation-safe UDP ownership or wider steering.
-static inline u32 udp_owner_pid(const void *table, size_type capacity,
-                                size_type returned_size, unsigned int family,
-                                const unsigned char *local, size_type local_size)
+// Windows UDP owner tables do not expose the connected remote peer. Every
+// compatible local bind therefore contributes evidence; exact/ANY overlap must
+// not hide another PID. PID zero is an unattributable matching row, not absence.
+static inline owner_result lookup_udp_owner(const void *table, size_type capacity,
+                                            size_type returned_size, unsigned int family,
+                                            const unsigned char *local, size_type local_size)
 {
-    if (!valid_endpoint(local, local_size, family, false)) return 0;
+    if (!valid_endpoint(local, local_size, family)) return result(owner_invalid);
     const size_type row_size = family == ipv4 ? sizeof(udp4_row) : sizeof(udp6_row);
     u32 count;
-    if (!valid_table(table, capacity, returned_size, row_size, count)) return 0;
+    if (!valid_table(table, capacity, returned_size, row_size, count)) return result(owner_invalid);
     const unsigned char *row = (const unsigned char *)table + 4;
-    u32 wildcard_pid = 0;
+    bool found = false, unknown_mapped_any = false, ambiguous = false, invalid_owner = false;
+    u32 pid = 0;
     for (u32 i = 0; i < count; ++i, row += row_size) {
         const size_type port_offset = family == ipv4 ? 4 : 20;
         const size_type address_offset = family == ipv4 ? 4 : 8;
         const size_type address_size = family == ipv4 ? 4 : 16;
         if (!same_port(row + port_offset, local)) continue;
+        const bool any = zero_bytes(row, address_size);
+        if (!any && !equal_bytes(row, local + address_offset, address_size)) continue;
+        if (family == ipv6) {
+            const u32 scope = read_le32(row + 16);
+            const u32 wanted_scope = read_le32(local + 24);
+            if (any ? (scope && scope != wanted_scope) : scope != wanted_scope) continue;
+            // A UDP6 ANY row might be IPV6_V6ONLY. The owner table cannot
+            // establish that it owns IPv4 traffic, so never guess that PID.
+            if (any && zero_bytes(local + 8, 10) &&
+                local[18] == 0xff && local[19] == 0xff)
+                unknown_mapped_any = true;
+        }
         const u32 candidate = read_le32(row + (family == ipv4 ? 8 : 24));
-        if (equal_bytes(row, local + address_offset, address_size)) return candidate;
-        if (zero_bytes(row, address_size)) wildcard_pid = candidate;
+        if (!candidate) { invalid_owner = true; continue; }
+        if (found && candidate != pid) ambiguous = true;
+        found = true;
+        pid = candidate;
     }
-    return wildcard_pid;
+    if (invalid_owner) return result(owner_invalid);
+    if (unknown_mapped_any || ambiguous) return result(owner_ambiguous);
+    return found ? result(owner_found, pid) : result(owner_none);
+}
+
+static inline u32 udp_owner_pid(const void *table, size_type capacity,
+                                size_type returned_size, unsigned int family,
+                                const unsigned char *local, size_type local_size)
+{
+    return lookup_udp_owner(table, capacity, returned_size, family, local, local_size).pid;
+}
+
+static inline owner_result lookup_udp_mapped_owner(const void *table, size_type capacity,
+                                                   size_type returned_size,
+                                                   const unsigned char *local, size_type local_size)
+{
+    unsigned char mapped_local[28];
+    if (!map_ipv4_endpoint(local, local_size, mapped_local, sizeof(mapped_local)))
+        return result(owner_invalid);
+    return lookup_udp_owner(table, capacity, returned_size, ipv6,
+                            mapped_local, sizeof(mapped_local));
 }
 
 } // namespace exl_socket_attribution
