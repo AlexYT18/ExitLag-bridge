@@ -1,0 +1,72 @@
+PASS Python syntax: 67 source files
+PASS Shell syntax
+PASS ShellCheck source errors
+PASS test_discovery_filters.py
+PASS test_identity_tools.py
+PASS test_installer.py
+PASS test_linux_desktop.py
+PASS test_linux_launcher.py
+PASS test_mac_distribution.py
+PASS test_process_picker.py
+PASS test_game_picker.py
+PASS test_linux_packaging.py
+PASS test_source_audit.py
+PASS test_runner.py
+PASS test-integration-support.py
+PASS test_benchmark_ipc.py
+PASS test_llvm_toolchain.py
+PASS test_build_runtime.py
+PASS Tk process picker integration
+PASS macOS account-free units
+PASS Native IPC transport
+PASS Native NFQUEUE verdict encoding
+PASS Shim IPC validation
+PASS Fresh backend build
+PASS Native TCP attribution
+PASS Native process identity
+PASS Native UDP attribution
+PASS Native UDP packet codec
+PASS Native UDP peer lifecycle
+PASS Native UDP maintenance scheduler
+PASS Native UDP daemon maintenance
+PASS Shim socket attribution
+PASS Shim worker lifecycle
+PASS Shim PID domains
+PASS Authenticated backend IPC
+PASS test-identity-map.sh
+PASS rpc-surface-test.sh
+PASS identity-assistant-test.sh
+PASS Process discovery
+PASS Doctor diagnoses
+PASS Windows shim build
+PASS Windows driver presence image build
+PASS Crash guard executable build only
+PASS ShellCheck runner scripts
+PASS Cppcheck native backend
+PASS GCC static analyzer IPC
+PASS GCC static analyzer tcp_attribution
+PASS GCC static analyzer process_identity
+PASS GCC static analyzer nfq_verdict
+PASS GCC static analyzer udp_attribution
+PASS GCC static analyzer udp_packet
+PASS GCC static analyzer udp_peers
+PASS ASan UBSan native IPC transport
+PASS ASan UBSan NFQUEUE verdict encoding
+PASS ASan UBSan shim IPC validation
+PASS ASan UBSan native TCP attribution
+PASS ASan UBSan native process identity
+PASS ASan UBSan native UDP attribution
+PASS ASan UBSan native UDP packet codec
+PASS ASan UBSan native UDP peer lifecycle
+PASS ASan UBSan native UDP maintenance scheduler
+PASS ASan UBSan native UDP daemon maintenance
+PASS ASan UBSan shim socket attribution
+PASS ASan UBSan shim worker lifecycle
+PASS ASan UBSan shim PID domains
+PASS ASan UBSan fresh backend
+PASS ASan UBSan authenticated backend IPC
+PASS Restore release backend build
+SKIP Level 2 kernel routing: separate disposable namespace test: tests/run-isolated.sh
+SKIP Level 3 live ExitLag and games: requires legitimate client/subscription and a suitable game host
+
+68 PASS, 0 FAIL, 2 SKIP; /workspace/exitlag-validation/reliability-final-cloud/results.json

@@ -1,0 +1,10 @@
+runtime: Preparing the private Wine runtime
+download: Downloading a verified setup component
+prefix: Preparing a dedicated Windows environment
+wmi: Checking Windows compatibility support
+prepared: Wine and the required WMI support are ready; select the official installer to finish
+runtime: Preparing the private Wine runtime
+prefix: Preparing a dedicated Windows environment
+wmi: Checking Windows compatibility support
+prepared: Wine and the required WMI support are ready; select the official installer to finish
+{"fresh_runtime_verified": true, "wmi_verified": true, "idempotent_prepare": true, "uninstall_preserved_prefix": true, "purge_scoped": true, "vendor_install_or_login_tested": false}

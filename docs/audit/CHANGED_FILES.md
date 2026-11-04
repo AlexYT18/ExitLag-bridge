@@ -1,8 +1,8 @@
 # Changed files
 
-Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `dfdd0ee43e2edb850fec31621e8feffa3dea2715`. Includes TCP attribution/authorization, process picker, experimental multi-endpoint UDP and minimal dashboard. Synthetic evidence is included; generated binaries and private runtime are excluded.
+Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `dfdd0ee43e2edb850fec31621e8feffa3dea2715`. Includes source hardening, attribution/authorization, UDP, process selection, worker lifecycle and LLVM installer packaging. Generated binaries and private runtime are excluded.
 
-43 existing files changed; 177 files added.
+46 existing files changed; 197 files added.
 
 | Status | File |
 | --- | --- |
@@ -26,6 +26,8 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Added | `backend/tcp_attribution.h` |
 | Added | `backend/udp_attribution.c` |
 | Added | `backend/udp_attribution.h` |
+| Added | `backend/udp_lifecycle.c` |
+| Added | `backend/udp_lifecycle.h` |
 | Added | `backend/udp_packet.c` |
 | Added | `backend/udp_packet.h` |
 | Added | `backend/udp_peers.c` |
@@ -38,6 +40,7 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Added | `docs/audit/INITIAL_AUDIT.md` |
 | Added | `docs/audit/ITERATION_REPORT.md` |
 | Added | `docs/audit/PROCESS_PICKER_ITERATION.md` |
+| Added | `docs/audit/RELIABILITY_AND_PACKAGING_ITERATION.md` |
 | Added | `docs/audit/ROADMAP.md` |
 | Added | `docs/audit/SOURCE_HASHES.json` |
 | Added | `docs/audit/TCP_ATTRIBUTION_ITERATION.md` |
@@ -115,6 +118,15 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Added | `docs/audit/evidence/process-picker-packaging.txt` |
 | Added | `docs/audit/evidence/process-picker-preview.png` |
 | Added | `docs/audit/evidence/process-picker-tk.txt` |
+| Added | `docs/audit/evidence/reliability-cloud-initial.txt` |
+| Added | `docs/audit/evidence/reliability-final-cloud.json` |
+| Added | `docs/audit/evidence/reliability-final-cloud.txt` |
+| Added | `docs/audit/evidence/reliability-fresh-wine.txt` |
+| Added | `docs/audit/evidence/reliability-isolated.txt` |
+| Added | `docs/audit/evidence/reliability-metrics-race.txt` |
+| Added | `docs/audit/evidence/reliability-package-tests.txt` |
+| Added | `docs/audit/evidence/reliability-payload-build.txt` |
+| Added | `docs/audit/evidence/reliability-runtime-tests.txt` |
 | Added | `docs/audit/evidence/tcp-iteration-cloud.json` |
 | Added | `docs/audit/evidence/tcp-iteration-cloud.txt` |
 | Added | `docs/audit/evidence/tcp-iteration-concurrent.txt` |
@@ -151,20 +163,24 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Added | `docs/audit/notes/TESTS_CI.md` |
 | Modified | `docs/compatibility.md` |
 | Added | `docs/game-selection.md` |
+| Added | `docs/peak-validation.md` |
 | Modified | `docs/pipeline-stages.md` |
 | Modified | `docs/process-identity-translation.md` |
 | Modified | `docs/repository-layout.md` |
 | Modified | `docs/rpc-surface.md` |
 | Modified | `docs/runtime-hardening.md` |
+| Added | `docs/shim-lifecycle.md` |
 | Modified | `docs/test-matrix.md` |
 | Modified | `docs/testing.md` |
 | Added | `docs/udp-multi.md` |
 | Modified | `installers/README.md` |
 | Added | `installers/bridge_setup/process_picker.py` |
+| Modified | `installers/build_runtime.py` |
 | Modified | `installers/linux/app.py` |
 | Modified | `installers/linux/build.py` |
 | Added | `installers/linux/game_picker.py` |
 | Modified | `installers/linux/run_root.py` |
+| Modified | `macos/test_bridge.py` |
 | Modified | `macos/test_pf_plan.py` |
 | Modified | `macos/test_wine_socket.py` |
 | Modified | `macos/wine_socket.py` |
@@ -177,6 +193,8 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Added | `shim/nfapi/socket_attribution.h` |
 | Added | `shim/nfapi/tcp_callback_policy.h` |
 | Added | `shim/nfapi/udp_validation.h` |
+| Added | `shim/nfapi/worker_lifecycle.h` |
+| Modified | `shim/nfapi/ws2_32.def` |
 | Modified | `shim/nfextlag/build.sh` |
 | Added | `tests/benchmark-ipc.py` |
 | Modified | `tests/build-nfapi-compat-smoketest.sh` |
@@ -201,6 +219,8 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Added | `tests/test-integration-support.py` |
 | Added | `tests/test-shim-attribution.cpp` |
 | Added | `tests/test-shim-attribution.sh` |
+| Added | `tests/test-shim-lifecycle.cpp` |
+| Added | `tests/test-shim-lifecycle.sh` |
 | Added | `tests/test-shim-pid-domain.cpp` |
 | Added | `tests/test-shim-pid-domain.sh` |
 | Added | `tests/test-shim-validation.cpp` |
@@ -211,6 +231,7 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Modified | `tests/test-udp-observe.py` |
 | Added | `tests/test_backend_ipc.py` |
 | Added | `tests/test_benchmark_ipc.py` |
+| Added | `tests/test_build_runtime.py` |
 | Added | `tests/test_game_picker.py` |
 | Added | `tests/test_identity_tools.py` |
 | Modified | `tests/test_linux_desktop.py` |
@@ -220,6 +241,8 @@ Audit baseline: `c0525a74c35fd74c815326d957c21a593a6aaccb`. Publication base: `d
 | Added | `tests/test_process_picker.py` |
 | Added | `tests/test_runner.py` |
 | Added | `tests/udp-attribution-test.c` |
+| Added | `tests/udp-lifecycle-test.c` |
+| Added | `tests/udp-maintenance-test.c` |
 | Added | `tests/udp-multi-client.py` |
 | Added | `tests/udp-packet-test.c` |
 | Added | `tests/udp-peers-test.c` |

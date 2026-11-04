@@ -1,0 +1,12 @@
+test_linux_packaged_shim_keeps_registration_abi_with_normal_entrypoint (__main__.RuntimeBuild.test_linux_packaged_shim_keeps_registration_abi_with_normal_entrypoint) ... ok
+test_llvm_dependency_check_lists_missing_tools (__main__.RuntimeBuild.test_llvm_dependency_check_lists_missing_tools) ... ok
+test_llvm_identity_changes_when_compiler_changes_at_same_path (__main__.RuntimeBuild.test_llvm_identity_changes_when_compiler_changes_at_same_path) ... ok
+test_llvm_payloads_use_native_scripts_and_only_required_linux_components (__main__.RuntimeBuild.test_llvm_payloads_use_native_scripts_and_only_required_linux_components) ... ok
+test_packaged_export_check_requires_core_and_both_driver_names_exactly (__main__.RuntimeBuild.test_packaged_export_check_requires_core_and_both_driver_names_exactly) ... ok
+test_unsupported_llvm_host_is_refused_before_compilation (__main__.RuntimeBuild.test_unsupported_llvm_host_is_refused_before_compilation) ... ok
+test_zig_identity_preserves_pinned_version (__main__.RuntimeBuild.test_zig_identity_preserves_pinned_version) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.008s
+
+OK

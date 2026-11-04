@@ -23,6 +23,15 @@ the opt-in mode. Async SDK semantics, worker stop/join, policy-routing coexisten
 performance and live game/relay evidence remain open; these tests do not close
 the full P1/P2 scope below.
 
+The [lifecycle and packaging iteration](RELIABILITY_AND_PACKAGING_ITERATION.md)
+implements retained worker handles, external stop/join, deferred callback stop,
+bounded connect, fair UDP maintenance and improved process selection. It builds
+real Linux payloads using LLVM and a versioned development installer. Native
+thread tests and pinned-Wine/WMI bootstrap are separate evidence: actual nfapi
+callbacks under Wine and live ExitLag/PEAK remain unverified. Async UDP semantics,
+performance and policy-routing coexistence remain open. Follow the
+[PEAK validation procedure](../peak-validation.md) for the blocked live stage.
+
 ## Validation levels
 
 - **L1:** no account/game or networking privileges. Source builds, pure unit tests, loopback mock IPC, malformed inputs, static analysis and supported sanitizers. A sandbox denying socket creation must report that specific blockage.
