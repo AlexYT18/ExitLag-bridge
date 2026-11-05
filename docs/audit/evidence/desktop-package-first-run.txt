@@ -1,0 +1,1 @@
+Installed desktop first-run and invalid-installer rejection passed; no vendor, root routing or account used.

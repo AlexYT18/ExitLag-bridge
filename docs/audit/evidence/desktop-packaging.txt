@@ -1,0 +1,16 @@
+test_default_build_retains_debian_metadata_and_portable_output (__main__.LinuxPackaging.test_default_build_retains_debian_metadata_and_portable_output) ... ok
+test_default_debian_architecture_validation_is_preserved (__main__.LinuxPackaging.test_default_debian_architecture_validation_is_preserved) ... ok
+test_missing_picker_dependency_prevents_packaging (__main__.LinuxPackaging.test_missing_picker_dependency_prevents_packaging) ... ok
+test_payload_hash_mismatch_and_symlink_are_refused_before_population (__main__.LinuxPackaging.test_payload_hash_mismatch_and_symlink_are_refused_before_population) ... ok
+test_population_includes_process_picker_and_dependencies (__main__.LinuxPackaging.test_population_includes_process_picker_and_dependencies) ... ok
+test_portable_only_never_invokes_debian_tools_and_has_complete_archive (__main__.LinuxPackaging.test_portable_only_never_invokes_debian_tools_and_has_complete_archive) ... ok
+test_private_umask_does_not_make_installed_program_unreadable (__main__.LinuxPackaging.test_private_umask_does_not_make_installed_program_unreadable) ... ok
+test_program_manifest_records_revision_and_every_packaged_hash (__main__.LinuxPackaging.test_program_manifest_records_revision_and_every_packaged_hash) ... ok
+test_real_dpkg_deb_accepts_fixture_metadata_without_root (__main__.LinuxPackaging.test_real_dpkg_deb_accepts_fixture_metadata_without_root) ... dpkg-deb: building package 'exitlag-bridge' in '/tmp/bridge-package-test-d5xiemtm/output/exitlag-bridge_0.4.0+arch.2_amd64.deb'.
+ok
+test_unsupported_host_is_refused_before_staging_or_tools (__main__.LinuxPackaging.test_unsupported_host_is_refused_before_staging_or_tools) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.078s
+
+OK

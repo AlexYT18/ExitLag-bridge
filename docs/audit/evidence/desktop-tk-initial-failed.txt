@@ -1,0 +1,38 @@
+test_all_navigation_pages_keep_primary_connection_control_and_honest_metrics (__main__.RealTkPicker.test_all_navigation_pages_keep_primary_connection_control_and_honest_metrics) ... ok
+test_combo_selection_wins_over_older_file_inspection (__main__.RealTkPicker.test_combo_selection_wins_over_older_file_inspection) ... ok
+test_dashboard_uses_selected_game_and_explicit_udp_without_verified_relay (__main__.RealTkPicker.test_dashboard_uses_selected_game_and_explicit_udp_without_verified_relay) ... ok
+test_diagnostics_render_and_clipboard_hide_secrets_and_private_paths (__main__.RealTkPicker.test_diagnostics_render_and_clipboard_hide_secrets_and_private_paths) ... FAIL
+test_edit_game_apply_cancel_and_save_preserve_private_validation (__main__.RealTkPicker.test_edit_game_apply_cancel_and_save_preserve_private_validation) ... ok
+test_keyboard_search_navigation_and_refresh_do_not_add_a_rule (__main__.RealTkPicker.test_keyboard_search_navigation_and_refresh_do_not_add_a_rule) ... ok
+test_native_game_requires_confirmed_identity (__main__.RealTkPicker.test_native_game_requires_confirmed_identity) ... ok
+test_running_picker_reports_launcher_and_wineserver_with_masked_details (__main__.RealTkPicker.test_running_picker_reports_launcher_and_wineserver_with_masked_details) ... FAIL
+test_saturated_checks_leave_refresh_available_for_retry (__main__.RealTkPicker.test_saturated_checks_leave_refresh_available_for_retry) ... ok
+test_select_game_and_save_private_valid_map (__main__.RealTkPicker.test_select_game_and_save_private_valid_map) ... ok
+test_slow_scan_keeps_tk_responsive_and_close_ignores_result (__main__.RealTkPicker.test_slow_scan_keeps_tk_responsive_and_close_ignores_result) ... ok
+test_slow_stop_keeps_tk_alive_and_releases_session_after_worker_finishes (__main__.RealTkPicker.test_slow_stop_keeps_tk_alive_and_releases_session_after_worker_finishes) ... ok
+test_sort_and_search_preserve_image_without_saving_and_clear_hidden_selection (__main__.RealTkPicker.test_sort_and_search_preserve_image_without_saving_and_clear_hidden_selection) ... ok
+test_stale_process_keeps_rule_list_unchanged (__main__.RealTkPicker.test_stale_process_keeps_rule_list_unchanged) ... ok
+test_two_images_require_explicit_selection (__main__.RealTkPicker.test_two_images_require_explicit_selection) ... ok
+
+======================================================================
+FAIL: test_diagnostics_render_and_clipboard_hide_secrets_and_private_paths (__main__.RealTkPicker.test_diagnostics_render_and_clipboard_hide_secrets_and_private_paths)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/exitlag-bridge/tests/gui-picker-smoke.py", line 460, in test_diagnostics_render_and_clipboard_hide_secrets_and_private_paths
+    self.pump(lambda: not desktop.tasks.active)
+  File "/workspace/exitlag-bridge/tests/gui-picker-smoke.py", line 142, in pump
+    self.fail('Tk asynchronous action did not complete before its deadline')
+AssertionError: Tk asynchronous action did not complete before its deadline
+
+======================================================================
+FAIL: test_running_picker_reports_launcher_and_wineserver_with_masked_details (__main__.RealTkPicker.test_running_picker_reports_launcher_and_wineserver_with_masked_details)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/exitlag-bridge/tests/gui-picker-smoke.py", line 534, in test_running_picker_reports_launcher_and_wineserver_with_masked_details
+    self.assertTrue(dialog.add_button.winfo_viewable())
+AssertionError: 0 is not true
+
+----------------------------------------------------------------------
+Ran 15 tests in 7.446s
+
+FAILED (failures=2)

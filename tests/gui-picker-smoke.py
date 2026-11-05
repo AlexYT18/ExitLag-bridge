@@ -430,7 +430,7 @@ class RealTkPicker(unittest.TestCase):
 
     def test_all_navigation_pages_keep_primary_connection_control_and_honest_metrics(self):
         desktop = self.dashboard()
-        desktop.window.geometry('1040x680+20+20')
+        desktop.window.geometry('1040x640+20+20')
         self.root.update()
         self.assertEqual(set(desktop.nav_buttons), {'home', 'games', 'statistics', 'setup', 'diagnostics'})
         self.assertEqual(desktop.primary_button, desktop.launch_button)
@@ -439,6 +439,11 @@ class RealTkPicker(unittest.TestCase):
                 button.invoke(); self.root.update()
                 self.assertTrue(desktop.pages[name].winfo_viewable(), name)
                 self.assertTrue(desktop.primary_button.winfo_viewable(), name)
+                if name == 'home':
+                    self.assertTrue(desktop.udp_toggle.winfo_viewable())
+                    self.assertTrue(desktop.manage_button.winfo_viewable())
+                if name == 'games':
+                    self.assertTrue(desktop.add_process_button.winfo_viewable())
                 self.assertGreaterEqual(desktop.primary_button.winfo_rootx(), desktop.window.winfo_rootx())
                 self.assertLessEqual(desktop.primary_button.winfo_rootx() + desktop.primary_button.winfo_width(),
                                      desktop.window.winfo_rootx() + desktop.window.winfo_width())

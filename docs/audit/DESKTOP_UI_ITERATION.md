@@ -62,13 +62,18 @@ route decisions остаются в официальном клиенте. Вс�
 | Portable builder с настоящими existing payloads | PASS, все UI modules включены |
 | `test_desktop_ui.py` для собранного дерева в Xvfb | PASS: первый запуск и invalid-installer rejection |
 
+[Launcher log](evidence/desktop-launcher.txt), [picker log](evidence/desktop-picker.txt),
+[Tk log](evidence/desktop-tk.txt), [packaging log](evidence/desktop-packaging.txt),
+[first-run](evidence/desktop-package-first-run.txt).
+
 Для Linux launcher проверялись асинхронная остановка, generation stale answers,
 failed stop и отсутствие повторного lease, корректные private log targets,
 ошибки и redaction. Для picker сохранены проверка owner/image, ambiguity,
 private saves и stale process отказ. Tk тесты проверяют пять страниц, реальный
 UI heartbeat при медленной операции, name/AppID search, masked card, edit
-apply/cancel/Save, clipboard redaction и доступность controls при 1040×680.
-Скриншоты ниже получены существующими preview переменными; synthetic fixtures
+apply/cancel/Save, clipboard redaction и доступность controls при 1040×640.
+При минимальном размере отдельно проверены доступность UDP, управления
+привязками, добавления процесса и общая кнопка. Скриншоты ниже получены существующими preview переменными; synthetic fixtures
 присутствуют только в тесте, а не в продукте.
 
 Сетевые, privileged и live tests не запускались: пользователь ограничил эту
@@ -78,7 +83,7 @@ apply/cancel/Save, clipboard redaction и доступность controls при
 
 ### Найденные FAIL и исправления
 
-Первый Tk прогон: 13 PASS / 2 FAIL из 15. Fixture нового dashboard не запускала
+[Первый Tk прогон](evidence/desktop-tk-initial-failed.txt): 13 PASS / 2 FAIL из 15. Fixture нового dashboard не запускала
 доставку TaskQueue callbacks; добавлен Tk-side delivery loop. Второй FAIL был
 реальным layout defect: footer кнопка не помещалась после смены шрифта.
 Footer и details теперь резервируют место снизу, таблица занимает остаток.
