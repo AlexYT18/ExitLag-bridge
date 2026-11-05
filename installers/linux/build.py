@@ -19,6 +19,8 @@ VERSION = '0.4.0+arch.1'
 FILES = ('backend/exitlag-netd', 'backend/run-tcp-redirect.sh', 'backend/run-udp-multi.sh', 'backend/runtime-guard.sh',
          'backend/nft-setup.sh', 'backend/nft-teardown.sh', 'installers/linux/app.py',
          'installers/linux/run_root.py', 'installers/linux/game_picker.py',
+         'installers/linux/desktop_support.py', 'installers/linux/desktop_session.py',
+         'installers/linux/desktop_ui.py',
          'tools/discover-game-processes.py', 'installers/setup.py', 'LICENSE', 'THIRD_PARTY.md',
          'docs/provenance-review.md')
 

@@ -83,6 +83,9 @@ class LinuxPackaging(unittest.TestCase):
         target = self.work / 'program'
         builder.populate(target)
         for name in ('installers/linux/game_picker.py',
+                     'installers/linux/desktop_support.py',
+                     'installers/linux/desktop_session.py',
+                     'installers/linux/desktop_ui.py',
                      'backend/run-udp-multi.sh',
                      'tools/discover-game-processes.py',
                      'installers/bridge_setup/process_picker.py',

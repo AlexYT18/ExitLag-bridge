@@ -24,7 +24,9 @@ with tempfile.TemporaryDirectory(prefix='desktop setup ') as temporary:
             desktop.window.update()
             time.sleep(.05)
         assert not desktop.busy
-        assert desktop.message.get().startswith('Setup stopped:'), desktop.message.get()
+        assert desktop._last_error.startswith('Подготовка остановлена:'), desktop.message.get()
+        assert desktop.session_status.get() == 'Ошибка'
+        assert desktop.relay_status.get() == 'Маршрут не подтверждён'
         assert not (state / 'runtime').exists()
         assert desktop.helper is None and desktop.client is None
         desktop.close()

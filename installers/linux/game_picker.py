@@ -12,8 +12,47 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
+# Also support direct importlib-based desktop/test entry points.
+_support_spec = importlib.util.spec_from_file_location(
+    '_exitlag_picker_support', Path(__file__).with_name('desktop_support.py'))
+_support = importlib.util.module_from_spec(_support_spec)
+_support_spec.loader.exec_module(_support)
+redact = _support.redact
+
 MAX_MAP = 65536
 _TECHNICAL = re.compile(r'^(wineserver|steam|steamwebhelper|opencode|discord|chrome|firefox|systemd|dbus|pipewire|wireplumber|plasmashell|xwayland)(?:$|[.\-])', re.I)
+
+
+def display_path(value):
+    """Presentation only: never change the path used for identity verification."""
+    if not value:
+        return '—'
+    value = str(value)
+    name = PureWindowsPath(value).name if '\\' in value else Path(value).name
+    name = ''.join(c for c in name if ord(c) >= 32 and ord(c) != 127)
+    return '…/' + name if name else '…'
+
+
+def candidate_warning(item, image_count=None):
+    """Informational classification, never a substitute for owner verification."""
+    names = (item.name.casefold(), item.executable.name.casefold())
+    if any(name.startswith('wineserver') for name in names):
+        return 'Выбран wineserver — это общий сервис Wine, а не подтверждённый процесс игры. Выберите процесс, владеющий сокетами игры.'
+    if any(re.search(r'(^steam(?:[.\-]|$)|steamwebhelper|launcher)', name) for name in names):
+        return 'Похоже на launcher или Steam. Его соединения не подтверждают трафик самой игры; проверьте владельца игровых сокетов.'
+    if image_count is not None and image_count > 1:
+        return 'Найдено несколько Windows images: выберите реальный executable игры. Автоматическая привязка неоднозначна.'
+    if item.prefix and image_count == 0:
+        return 'Windows image не найден: требуется настоящий executable или подтверждённая identity. Путь не будет угадан.'
+    return ''
+
+
+def candidate_details(item):
+    suffix = f' · Steam AppID {item.steam_appid}' if item.steam_appid else ''
+    name = redact(item.name).replace('\n', ' ')
+    return (f'{name} · PID {item.pid} · {item.kind.title()}{suffix}\n'
+            f'Executable: {display_path(item.executable)}\n'
+            f'Wine / Proton prefix: {display_path(item.prefix)}')
 
 
 def _private(info, uid):
@@ -121,6 +160,22 @@ class MappingController:
     def remove(self, indices):
         indices = set(indices)
         self.text = ''.join(line for index, line in enumerate(self.text.splitlines(keepends=True)) if index not in indices)
+
+    def replace(self, index, row):
+        """Validate a replacement without changing other lines or a failed draft."""
+        lines = self.text.splitlines(keepends=True)
+        if (isinstance(index, bool) or not isinstance(index, int) or
+                index < 0 or index >= len(lines) or not lines[index].strip() or
+                lines[index].lstrip().startswith('#')):
+            raise ValueError('Select one existing game entry')
+        trial = MappingController(''.join(line for number, line in enumerate(lines) if number != index))
+        trial.add(row)
+        ending = '\r\n' if lines[index].endswith('\r\n') else '\n' if lines[index].endswith('\n') else ''
+        lines[index] = row.rstrip('\n') + ending
+        replacement = ''.join(lines)
+        if len(replacement.encode('utf-8')) > MAX_MAP:
+            raise ValueError('Game settings are too large')
+        self.text = replacement
 
     def advanced(self, text):
         if len(text.encode('utf-8')) > MAX_MAP:
@@ -232,8 +287,8 @@ class RunningGameDialog:
         self.picker, self.on_add = picker, on_add
         self.window = tk.Toplevel(parent)
         self.window.title('Choose a running game')
-        self.window.geometry('980x660')
-        self.window.minsize(820, 580)
+        self.window.geometry('1000x700')
+        self.window.minsize(900, 640)
         self.window.transient(parent)
         self.tasks = TaskQueue()
         self.closed = False
@@ -242,8 +297,10 @@ class RunningGameDialog:
         self.sort_by, self.descending = None, False
         self.query, self.show_all = tk.StringVar(), tk.BooleanVar(value=False)
         self.status, self.details = tk.StringVar(value='Reading your network processes...'), tk.StringVar()
+        self.selection_warning = tk.StringVar()
         body = ttk.Frame(self.window, padding=16)
         body.pack(fill='both', expand=True)
+        bottom = ttk.Frame(body); bottom.pack(side='bottom', fill='x', pady=(10, 0))
         ttk.Label(body, text='Start the game and open a network session, then select it below.').pack(anchor='w')
         controls = ttk.Frame(body)
         controls.pack(fill='x', pady=10)
@@ -257,7 +314,7 @@ class RunningGameDialog:
         ttk.Checkbutton(body, text='Show all network processes', variable=self.show_all, command=self.render).pack(anchor='w')
         columns = ('name', 'pid', 'runtime', 'transport', 'sockets', 'appid')
         frame = ttk.Frame(body); frame.pack(fill='both', expand=True, pady=8)
-        self.process_tree = ttk.Treeview(frame, columns=columns, show='headings', selectmode='browse', height=10)
+        self.process_tree = ttk.Treeview(frame, columns=columns, show='headings', selectmode='browse', height=7)
         for name, title, width in zip(columns, ('Game / process', 'PID', 'Runtime', 'Transport', 'Sockets', 'Steam AppID'), (260, 70, 105, 100, 70, 100)):
             self.process_tree.heading(name, text=title, command=lambda column=name: self.sort(column))
             self.process_tree.column(name, width=width, minwidth=55)
@@ -267,6 +324,8 @@ class RunningGameDialog:
         self.process_tree.pack(side='left', fill='both', expand=True); scrollbar.pack(side='right', fill='y')
         self.process_tree.bind('<<TreeviewSelect>>', self.select)
         ttk.Label(body, textvariable=self.details, wraplength=920).pack(anchor='w', pady=(2, 8))
+        ttk.Label(body, textvariable=self.selection_warning, wraplength=920,
+                  foreground='#f1bd68').pack(anchor='w', pady=(0, 6))
         image_line = ttk.Frame(body); image_line.pack(fill='x')
         ttk.Label(image_line, text='Windows game image').pack(side='left')
         self.image_combo = ttk.Combobox(image_line, state='readonly')
@@ -280,7 +339,6 @@ class RunningGameDialog:
         self.transport_note = ttk.Label(body, text='TCP is enabled by default. Experimental UDP can be enabled in the dashboard before launching; listed sockets do not verify routing.', wraplength=920)
         self.transport_note.pack(anchor='w', pady=(4, 8))
         ttk.Label(body, textvariable=self.status, wraplength=920).pack(anchor='w')
-        bottom = ttk.Frame(body); bottom.pack(fill='x', pady=(10, 0))
         self.add_button = ttk.Button(bottom, text='Add selected game', command=self.add, state='disabled')
         self.add_button.pack(side='right'); ttk.Button(bottom, text='Cancel', command=self.close).pack(side='right', padx=8)
         self.query.trace_add('write', lambda *_: self.render())
@@ -309,7 +367,7 @@ class RunningGameDialog:
             self.tasks.submit(kind, operation, callback)
             return True
         except (ValueError, RuntimeError) as error:
-            self.status.set(str(error))
+            self.status.set(redact(error))
             return False
 
     def focus_search(self, _event=None):
@@ -349,6 +407,7 @@ class RunningGameDialog:
         self.selected = self.manual_identity = None
         self.process_tree.delete(*self.process_tree.get_children())
         self.details.set('')
+        self.selection_warning.set('')
         self.images = []; self.image_combo.configure(values=()); self.image_combo.set('')
         self.add_button.state(['disabled']); self.browse_button.state(['disabled'])
         self.tasks.cancel('images'); self.tasks.cancel('file'); self.tasks.cancel('mapping')
@@ -356,7 +415,7 @@ class RunningGameDialog:
         def done(items, error):
             self.refresh_button.state(['!disabled'])
             if error:
-                self.candidates = []; self.render(); self.status.set(str(error))
+                self.candidates = []; self.render(); self.status.set(redact(error))
             else:
                 self.candidates = items; self.render()
         if not self._submit('scan', self.picker.list_candidates, done):
@@ -383,6 +442,7 @@ class RunningGameDialog:
             self.image_combo.configure(values=()); self.image_combo.set('')
             self.add_button.state(['disabled']); self.browse_button.state(['disabled'])
             self.details.set('')
+            self.selection_warning.set('')
         visible = len(items)
         self.status.set(f'{visible} process(es) shown. Select a game.' if visible else 'No matching game found. Open a game session, Refresh, or Show all network processes.')
 
@@ -395,15 +455,16 @@ class RunningGameDialog:
         self.tasks.cancel('images'); self.tasks.cancel('file'); self.tasks.cancel('mapping')
         self.image_combo.configure(values=()); self.image_combo.set(''); self.add_button.state(['disabled'])
         self.browse_button.state(['!disabled'] if item.prefix else ['disabled'])
-        suffix = f' | Steam {item.steam_appid}' if item.steam_appid else ''
         scope = 'This rule permits the selected runtime in this game prefix, including other programs launched in that prefix.' if item.prefix else 'Native Linux game: choose Advanced identity to enter its confirmed ExitLag Windows identity.'
-        self.details.set(f'{item.name} | {item.kind.title()}{suffix}\n{scope}')
+        self.details.set(candidate_details(item))
+        self.selection_warning.set(candidate_warning(item) or scope)
         self.status.set('Checking Windows images mapped by this process...')
         def done(images, error):
             if self.selected != item: return
-            if error: self.status.set(str(error)); return
+            if error: self.status.set(redact(error)); return
             self.images = images
-            self.image_combo.configure(values=[f'{image.path.name} - {image.windows_path}' for image in images])
+            self.selection_warning.set(candidate_warning(item, len(images)) or scope)
+            self.image_combo.configure(values=[image.path.name for image in images])
             if len(images) == 1:
                 self.image_combo.current(0); self.image_selected()
             else:
@@ -415,6 +476,10 @@ class RunningGameDialog:
         self.tasks.cancel('mapping')
         self.manual_identity = None
         self.add_button.state(['!disabled'] if self.selected and self.image_combo.current() >= 0 else ['disabled'])
+        if self.selected:
+            self.selection_warning.set(candidate_warning(self.selected) or
+                ('Привязка разрешает выбранный runtime во всём prefix.' if self.selected.prefix else
+                 'Windows identity должна быть подтверждена для этой игры в ExitLag.'))
         self.status.set('Game image selected. Ownership and image will be checked again when adding.')
 
     def choose_file(self):
@@ -426,9 +491,9 @@ class RunningGameDialog:
         self.add_button.state(['disabled']); self.status.set('Checking the selected game executable...')
         def done(image, error):
             if self.selected != item: return
-            if error: self.status.set(str(error)); return
+            if error: self.status.set(redact(error)); return
             self.images = [image]; self.manual_identity = None
-            self.image_combo.configure(values=[f'{image.path.name} - {image.windows_path}'])
+            self.image_combo.configure(values=[image.path.name])
             self.image_combo.current(0); self.image_selected()
         self._submit('file', lambda: self.picker.image_from_file(item, path), done)
 
@@ -449,10 +514,10 @@ class RunningGameDialog:
         self.add_button.state(['disabled']); self.status.set('Rechecking the process and socket owner...')
         def done(row, error):
             if self.selected != item: return
-            if error: self.status.set(str(error)); return
+            if error: self.status.set(redact(error)); return
             try: self.on_add(row)
             except (OSError, ValueError) as failure:
-                self.status.set(str(failure)); return
+                self.status.set(redact(failure)); return
             self.close()
         self._submit('mapping', lambda: self.picker.mapping(item, image=image, windows_identity=identity), done)
 
@@ -497,6 +562,7 @@ class MappingEditor:
         self.tree.pack(side='left', fill='both', expand=True); scrollbar.pack(side='right', fill='y')
         controls = ttk.Frame(body); controls.pack(fill='x')
         self.add_button = ttk.Button(controls, text='Add running game...', command=self.open_running); self.add_button.pack(side='left')
+        self.edit_button = ttk.Button(controls, text='Изменить', command=self.edit_selected); self.edit_button.pack(side='left', padx=(8, 0))
         self.remove_button = ttk.Button(controls, text='Remove', command=self.remove); self.remove_button.pack(side='left', padx=8)
         self.advanced_button = ttk.Button(controls, text='Advanced...', command=self.advanced); self.advanced_button.pack(side='left')
         self.save_button = ttk.Button(controls, text='Save', command=self.save); self.save_button.pack(side='right')
@@ -521,7 +587,7 @@ class MappingEditor:
     def render(self):
         self.tree.delete(*self.tree.get_children())
         for index, name, kind, identity, _source in self.controller.rows():
-            self.tree.insert('', 'end', iid=str(index), values=(name, kind, identity))
+            self.tree.insert('', 'end', iid=str(index), values=(name, kind, display_path(identity)))
 
     def open_running(self):
         if self.saving: return None
@@ -529,7 +595,7 @@ class MappingEditor:
             self.running_dialog = RunningGameDialog(self.window, self.picker, self.add_row)
             return self.running_dialog
         except (OSError, ValueError) as error:
-            messagebox.showerror('Game selection', str(error), parent=self.window)
+            messagebox.showerror('Game selection', redact(error), parent=self.window)
 
     def add_row(self, row):
         self.controller.add(row); self.render(); self.status.set('Game added. Save to use it next time routing starts.')
@@ -538,19 +604,83 @@ class MappingEditor:
         if self.saving: return
         self.controller.remove(int(value) for value in self.tree.selection()); self.render()
 
+    def edit_selected(self):
+        if self.saving: return None
+        selected = self.tree.selection()
+        if len(selected) != 1:
+            self.status.set('Выберите одну игру для редактирования.'); return None
+        index = int(selected[0])
+        fields = self.controller.text.splitlines()[index].split('\t')
+        prefix = fields[0].startswith('wineprefix:')
+        if len(fields) != (3 if prefix else 2):
+            self.status.set('Эта запись требует проверки в Advanced. Исходная строка сохранена.'); return None
+        dialog = tk.Toplevel(self.window)
+        dialog.title('Изменить игру'); dialog.geometry('680x360')
+        dialog.transient(self.window); dialog.grab_set()
+        body = ttk.Frame(dialog, padding=20); body.pack(fill='both', expand=True)
+        ttk.Label(body, text='Редактирование выбранной привязки', font=('', 14, 'bold')).pack(anchor='w')
+        summary = tk.StringVar()
+        def describe():
+            source = fields[0].removeprefix('wineprefix:')
+            summary.set(f'Windows identity: {display_path(fields[1])}\n'
+                        f'{"Prefix" if prefix else "Executable"}: {display_path(source)}' +
+                        (f'\nRuntime: {display_path(fields[2])}' if prefix else ''))
+        describe()
+        ttk.Label(body, textvariable=summary, wraplength=620).pack(anchor='w', pady=(14, 12))
+        ttk.Label(body, text='Полные пути скрыты. Изменения остаются черновиком до Save; при сохранении повторно проверяются executable, prefix и права файла.', wraplength=620).pack(anchor='w')
+        controls = ttk.Frame(body); controls.pack(fill='x', pady=16)
+        def identity():
+            value = simpledialog.askstring('Windows identity', 'Полная Windows identity, подтверждённая для этой игры в ExitLag:', parent=dialog)
+            if value is not None:
+                fields[1] = value; describe()
+        def source():
+            value = (filedialog.askdirectory(parent=dialog, title='Выберите игровой prefix') if prefix else
+                     filedialog.askopenfilename(parent=dialog, title='Выберите executable игры'))
+            if value:
+                try: fields[0] = ('wineprefix:' if prefix else '') + str(Path(value).resolve(strict=True))
+                except OSError as error:
+                    messagebox.showerror('Executable / prefix', type(error).__name__, parent=dialog); return
+                describe()
+        def owner():
+            value = filedialog.askopenfilename(parent=dialog, title='Выберите runtime, владеющий сокетами игры')
+            if value:
+                try: fields[2] = str(Path(value).resolve(strict=True))
+                except OSError as error:
+                    messagebox.showerror('Runtime', type(error).__name__, parent=dialog); return
+                describe()
+        ttk.Button(controls, text='Windows identity…', command=identity).pack(side='left')
+        ttk.Button(controls, text='Выбрать prefix…' if prefix else 'Выбрать executable…', command=source).pack(side='left', padx=8)
+        if prefix: ttk.Button(controls, text='Выбрать runtime…', command=owner).pack(side='left')
+        def cancel():
+            dialog.destroy(); self.window.grab_set()
+        def apply():
+            try: self.controller.replace(index, '\t'.join(fields))
+            except ValueError as error:
+                messagebox.showerror('Изменить игру', redact(error), parent=dialog); return
+            self.render(); self.tree.selection_set(str(index))
+            self.status.set('Игра изменена. Нажмите Save для проверки и сохранения настроек.')
+            cancel()
+        actions = ttk.Frame(body); actions.pack(fill='x', side='bottom')
+        ttk.Button(actions, text='Применить', command=apply).pack(side='right')
+        ttk.Button(actions, text='Отмена', command=cancel).pack(side='right', padx=8)
+        dialog.protocol('WM_DELETE_WINDOW', cancel)
+        return dialog
+
     def advanced(self):
         if self.saving: return
         dialog = tk.Toplevel(self.window); dialog.title('Advanced mappings'); dialog.geometry('900x460')
         dialog.transient(self.window); dialog.grab_set()
         ttk.Label(dialog, text='Manual mappings use Tabs. Wine/Proton rows require prefix, Windows identity, and actual runtime executable. Existing rows and comments are preserved.', wraplength=850).pack(padx=16, pady=10, anchor='w')
-        editor = tk.Text(dialog, wrap='none'); editor.pack(fill='both', expand=True, padx=16)
+        editor = tk.Text(dialog, wrap='none', background='#18202b', foreground='#e6edf3',
+                         insertbackground='#e6edf3', selectbackground='#315d80', relief='flat')
+        editor.pack(fill='both', expand=True, padx=16)
         editor.insert('1.0', self.controller.text)
         def cancel():
             dialog.destroy(); self.window.grab_set()
         def apply():
             try: self.controller.advanced(editor.get('1.0', 'end-1c'))
             except ValueError as error:
-                messagebox.showerror('Advanced mappings', str(error), parent=dialog); return
+                messagebox.showerror('Advanced mappings', redact(error), parent=dialog); return
             self.render(); cancel()
         def insert(prefix=False):
             try:
@@ -560,7 +690,7 @@ class MappingEditor:
                         editor.insert('end', '\n')
                     editor.insert('end', row)
             except (OSError, ValueError) as error:
-                messagebox.showerror('Manual mapping', str(error), parent=dialog)
+                messagebox.showerror('Manual mapping', redact(error), parent=dialog)
         line = ttk.Frame(dialog); line.pack(fill='x', padx=16, pady=12)
         ttk.Button(line, text='Add executable...', command=insert).pack(side='left')
         ttk.Button(line, text='Add Wine prefix...', command=lambda: insert(True)).pack(side='left', padx=8)
@@ -571,13 +701,13 @@ class MappingEditor:
     def save(self):
         if self.saving: return
         self.saving = True; self.status.set('Validating and saving game settings...')
-        self.save_button.state(['disabled']); self.add_button.state(['disabled']); self.remove_button.state(['disabled']); self.advanced_button.state(['disabled'])
+        self.save_button.state(['disabled']); self.add_button.state(['disabled']); self.remove_button.state(['disabled']); self.edit_button.state(['disabled']); self.advanced_button.state(['disabled'])
         text, original = self.controller.text, self.controller.original
         def done(_value, error):
             self.saving = False
             if error:
-                self.status.set(str(error))
-                self.save_button.state(['!disabled']); self.add_button.state(['!disabled']); self.remove_button.state(['!disabled']); self.advanced_button.state(['!disabled'])
+                self.status.set(redact(error))
+                self.save_button.state(['!disabled']); self.add_button.state(['!disabled']); self.remove_button.state(['!disabled']); self.edit_button.state(['!disabled']); self.advanced_button.state(['!disabled'])
             else:
                 self.controller.original = text; self.close()
         self.tasks.submit('save', lambda: save_map(self.path, text, self.validator, expected=original), done)

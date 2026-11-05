@@ -76,6 +76,67 @@ class MappingControllerTests(unittest.TestCase):
         with self.assertRaises(ValueError): model.advanced('x' * (picker.MAX_MAP + 1))
         self.assertEqual(model.text, '# new\nunknown old row\n')
 
+    def test_replace_keeps_comments_order_and_original_snapshot(self):
+        initial = '# comment\r\n/game\tC:\\First.exe\r\n\r\n/other\tC:\\Other.exe'
+        model = picker.MappingController(initial)
+        model.replace(1, '/game\tC:\\Changed.exe')
+        self.assertEqual(model.text, '# comment\r\n/game\tC:\\Changed.exe\r\n\r\n/other\tC:\\Other.exe')
+        self.assertEqual(model.original, initial)
+        model.replace(3, '/other\tC:\\Last.exe')
+        self.assertFalse(model.text.endswith('\n'))
+
+    def test_replace_duplicate_or_injected_entry_keeps_entire_draft(self):
+        initial = '/first\tC:\\First.exe\n/second\tC:\\Second.exe\n'
+        model = picker.MappingController(initial)
+        for row in ('/second\tC:\\Other.exe', '/first\tC:\\First.exe\n/injected\tC:\\Other.exe',
+                    'wineprefix:/prefix\tC:\\Game.exe', '/first\t'):
+            with self.subTest(row=row), self.assertRaises(ValueError):
+                model.replace(0, row)
+            self.assertEqual(model.text, initial)
+
+    def test_replace_rejects_comment_blank_and_stale_selection(self):
+        model = picker.MappingController('# keep\n\n/game\tC:\\Game.exe\n')
+        for index in (-1, 0, 1, 3, True, '2'):
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                model.replace(index, '/new\tC:\\New.exe')
+        self.assertEqual(model.text, model.original)
+
+    def test_replace_prefix_owner_and_capacity_are_checked(self):
+        initial = 'wineprefix:/prefix\tC:\\Game.exe\t/runtime\n'
+        model = picker.MappingController(initial)
+        model.replace(0, 'wineprefix:/prefix\tC:\\Other.exe\t/other-runtime')
+        changed = model.text
+        with self.assertRaisesRegex(ValueError, 'too large'):
+            model.replace(0, '/source\tC:\\' + ('x' * picker.MAX_MAP) + '.exe')
+        self.assertEqual(model.text, changed)
+
+
+class ProcessPresentationTests(unittest.TestCase):
+    def candidate(self, name='Game.exe', executable='/private/user/game/runtime', prefix='/private/user/game/pfx'):
+        return SimpleNamespace(name=name, pid=123, kind='proton', steam_appid='3527290',
+                               executable=Path(executable), prefix=Path(prefix) if prefix else None)
+
+    def test_details_show_actual_process_metadata_without_private_paths(self):
+        details = picker.candidate_details(self.candidate())
+        self.assertIn('PID 123', details)
+        self.assertIn('3527290', details)
+        self.assertIn('…/runtime', details)
+        self.assertIn('…/pfx', details)
+        self.assertNotIn('/private/user', details)
+        self.assertEqual(picker.display_path(r'C:\Private User\Games\Game.exe'), '…/Game.exe')
+        self.assertEqual(picker.display_path(None), '—')
+
+    def test_wineserver_and_launcher_warn_without_inventing_identity(self):
+        self.assertIn('wineserver', picker.candidate_warning(self.candidate('wineserver')))
+        self.assertIn('launcher', picker.candidate_warning(self.candidate('Steam')))
+        self.assertIn('launcher', picker.candidate_warning(self.candidate('GameLauncher.exe')))
+        self.assertEqual(picker.candidate_warning(self.candidate(), 1), '')
+
+    def test_ambiguous_and_missing_images_are_explicit(self):
+        self.assertIn('несколько', picker.candidate_warning(self.candidate(), 2))
+        self.assertIn('не найден', picker.candidate_warning(self.candidate(), 0))
+        self.assertEqual(picker.candidate_warning(self.candidate(prefix=None), 0), '')
+
 
 class ManualFallbackTests(unittest.TestCase):
     def test_cancelled_file_selection_does_not_request_identity(self):
