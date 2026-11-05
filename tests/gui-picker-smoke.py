@@ -157,6 +157,8 @@ class RealTkPicker(unittest.TestCase):
         self.assertFalse(self.path.exists(), 'process selection must not silently persist a rule')
         preview = os.environ.get('EXL_GUI_PREVIEW')
         if preview:
+            from tkinter import font
+            self.assertIn('DejaVu Sans', font.families(self.root), 'Preview needs Unicode fonts; use the distribution Python/Tk')
             from PIL import ImageGrab
             self.root.update()
             x, y = dialog.window.winfo_rootx(), dialog.window.winfo_rooty()
@@ -407,6 +409,8 @@ class RealTkPicker(unittest.TestCase):
         desktop.saved_query.set(''); self.root.update()
         preview = os.environ.get('EXL_DASHBOARD_PREVIEW')
         if preview:
+            from tkinter import font
+            self.assertIn('DejaVu Sans', font.families(self.root), 'Preview needs Unicode fonts; use the distribution Python/Tk')
             from PIL import ImageGrab
             self.root.update()
             x, y = desktop.window.winfo_rootx(), desktop.window.winfo_rooty()
@@ -582,6 +586,10 @@ class RealTkPicker(unittest.TestCase):
             self.assertNotIn(str(self.directory), dialog.details.get())
             self.root.update()
             self.assertTrue(dialog.add_button.winfo_viewable())
+            self.assertTrue(dialog.status_label.winfo_viewable())
+            self.assertTrue(dialog.image_combo.winfo_viewable())
+            self.assertLessEqual(dialog.status_label.winfo_rooty() + dialog.status_label.winfo_height(),
+                                 dialog.window.winfo_rooty() + dialog.window.winfo_height())
             dialog.close()
 
 

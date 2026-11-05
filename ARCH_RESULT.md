@@ -7,7 +7,8 @@
 - [Полный отчёт об изменениях и проверках](docs/audit/ITERATION_REPORT.md)
 - [TCP attribution](docs/audit/TCP_ATTRIBUTION_ITERATION.md)
 - [Авторизация DNAT](docs/audit/TCP_AUTHORIZATION_ITERATION.md)
-- [Текущая итерация: lifecycle, UDP, выбор процессов и пакет](docs/audit/RELIABILITY_AND_PACKAGING_ITERATION.md)
+- [Текущая итерация: desktop UI](docs/audit/DESKTOP_UI_ITERATION.md)
+- [Предыдущая итерация: lifecycle, UDP, выбор процессов и пакет](docs/audit/RELIABILITY_AND_PACKAGING_ITERATION.md)
 - [Предыдущая итерация: UDP и минимальный интерфейс](docs/audit/UDP_INTEGRATION_ITERATION.md)
 - [Включение UDP и ограничения](docs/udp-multi.md)
 - [Выбор запущенной игры без ручных Linux-путей](docs/game-selection.md)
@@ -29,7 +30,7 @@ bash tests/run-isolated.sh
 Первый runner выполняет проверки без root и аккаунта ExitLag. Второй создаёт
 одноразовые namespaces для kernel networking; отсутствие возможностей означает
 SKIP, а не успешную проверку. Source archive не содержит готовых payloads.
-Отдельный экспериментальный installer `0.4.0+arch.1` собирается с настоящими
+Отдельный экспериментальный installer `0.4.0+arch.2` собирается с настоящими
 compatibility DLL по [инструкции Arch](docs/arch-linux.md). Wine prefix,
 оригинальный клиент, учётные данные и игровые captures в пакет не включены.
 

@@ -48,7 +48,7 @@ account state and the proprietary installer. This manifest is integrity metadata
 not a signature or proof of gameplay. Publish the matching bridge sources and the
 corresponding Wine source archive alongside the binary package.
 
-Extract `build/releases/exitlag-bridge-0.4.0+arch.1-linux-x86_64.tar.gz`, then run its
+Extract `build/releases/exitlag-bridge-0.4.0+arch.2-linux-x86_64.tar.gz`, then run its
 `install.sh` as described below. Updating Git sources alone does not update
 `/usr/local/lib/exitlag-bridge`. Quit the running bridge before installing an update;
 the installer preserves the separate user setup directory.
