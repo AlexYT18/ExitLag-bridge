@@ -1,0 +1,59 @@
+name: Arch Linux source validation
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: linux-source-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source:
+    name: Account-free source (Arch Linux x86_64)
+    runs-on: ubuntu-24.04
+    container: archlinux:base
+    timeout-minutes: 20
+    steps:
+      - name: Install source-check dependencies
+        run: |
+          pacman -Syu --noconfirm --needed \
+            gcc make python tk git ca-certificates libmnl clang lld llvm \
+            shellcheck cppcheck util-linux xorg-server-xvfb xorg-xauth ttf-dejavu
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Prepare unprivileged test user
+        run: |
+          useradd --create-home --uid 1001 bridge-ci
+          chown -R bridge-ci:bridge-ci "$GITHUB_WORKSPACE"
+      - name: Source, mock IPC, sanitizer and static checks
+        run: |
+          test_user_home="$(getent passwd bridge-ci | cut -d: -f6)"
+          runuser -u bridge-ci -- env HOME="$test_user_home" \
+            bash tests/run-cloud.sh --sanitizers --output-dir build/cloud-validation
+      - name: Publish explicit PASS FAIL SKIP summary
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+          path = Path('build/cloud-validation/results.json')
+          if not path.exists():
+              print('FAIL: source checks did not produce a result report.')
+          else:
+              report = json.loads(path.read_text())
+              print('| Check | Status | Reason |\n| --- | --- | --- |')
+              for result in report['results']:
+                  reason = result.get('reason', '').replace('|', '\\|').replace('\n', ' ')
+                  print(f"| {result['name']} | {result['status']} | {reason} |")
+          PY
+      - name: Upload account-free validation evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: source-arch-validation
+          path: |
+            build/cloud-validation/results.json
+            build/cloud-validation/*.log
+          if-no-files-found: error
+          retention-days: 7

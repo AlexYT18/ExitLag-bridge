@@ -1,0 +1,3 @@
+# Preserve legal notices and Wine patch context verbatim.
+LICENSES/** -whitespace
+wine-wbemprox/patches/*.patch -whitespace
